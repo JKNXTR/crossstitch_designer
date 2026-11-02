@@ -1,0 +1,1974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CrossStitch Designer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#1e1e2e;--bg2:#16162b;--bg3:#2a2a3e;--bg4:#32324a;
+  --fg:#dcdceb;--fg2:#a0a0b8;--accent:#2a7fd4;--accent2:#3a90e8;
+  --border:#404058;--danger:#e84040;--success:#40b840;
+  --cell:16px;
+}
+body{background:var(--bg);color:var(--fg);font:13px/1.4 system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+button{background:var(--bg4);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:5px 10px;cursor:pointer;font:inherit;transition:background .15s}
+button:hover:not(:disabled){background:var(--bg3);border-color:var(--accent)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:var(--accent);border-color:var(--accent2);color:#fff}
+button.primary:hover:not(:disabled){background:var(--accent2)}
+select,input[type=number],input[type=range]{background:var(--bg2);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:3px 6px;font:inherit}
+input[type=range]{padding:0;cursor:pointer;accent-color:var(--accent)}
+label{color:var(--fg2);font-size:12px}
+h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg2);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.group{padding:10px;border-bottom:1px solid var(--border)}
+.row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.row label{flex:1;white-space:nowrap}
+.row select,.row input[type=number]{flex:1;min-width:0}
+.slider-row{display:flex;flex-direction:column;gap:2px;margin-bottom:5px}
+.slider-row .top{display:flex;justify-content:space-between}
+.slider-row input[type=range]{width:100%}
+
+/* Layout */
+#toolbar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+#toolbar .sep{width:1px;height:24px;background:var(--border);margin:0 2px}
+#status{flex:1;font-size:12px;color:var(--fg2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#progress-bar{height:3px;background:var(--accent);width:0%;transition:width .3s;position:absolute;top:0;left:0;right:0}
+#main{display:flex;flex:1;overflow:hidden;position:relative}
+
+/* Left panel */
+#left-panel{width:250px;flex-shrink:0;overflow-y:auto;background:var(--bg2);border-right:1px solid var(--border)}
+#left-panel::-webkit-scrollbar{width:5px}
+#left-panel::-webkit-scrollbar-thumb{background:var(--border)}
+
+/* Center */
+#center{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+#source-bar{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0}
+#source-img-wrap{width:80px;height:60px;border:1px solid var(--border);border-radius:3px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg2);flex-shrink:0}
+#source-img{max-width:100%;max-height:100%;object-fit:contain;display:none}
+#source-placeholder{color:var(--fg2);font-size:11px;text-align:center;padding:4px}
+#canvas-wrap{flex:1;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}
+#pattern-canvas{cursor:crosshair;image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+#zoom-controls{position:absolute;bottom:10px;right:10px;display:flex;gap:4px}
+#zoom-controls button{width:30px;height:30px;padding:0;font-size:16px;font-weight:bold}
+#canvas-info{position:absolute;top:6px;left:8px;font-size:11px;color:var(--fg2);background:rgba(0,0,0,.5);padding:2px 6px;border-radius:3px;pointer-events:none}
+
+/* Right panel */
+#right-panel{width:300px;flex-shrink:0;overflow-y:auto;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column}
+#right-panel::-webkit-scrollbar{width:5px}
+#right-panel::-webkit-scrollbar-thumb{background:var(--border)}
+#legend-stats{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;line-height:1.8}
+#legend-stats strong{color:var(--accent)}
+#legend-table-wrap{flex:1;overflow-y:auto}
+#legend-table{width:100%;border-collapse:collapse;font-size:12px}
+#legend-table th{background:var(--bg3);color:var(--fg2);padding:5px 6px;text-align:left;position:sticky;top:0;font-weight:600;font-size:11px;border-bottom:1px solid var(--border)}
+#legend-table td{padding:4px 6px;border-bottom:1px solid var(--border)}
+#legend-table tr:hover td{background:var(--bg3)}
+.swatch{width:20px;height:16px;border-radius:2px;border:1px solid rgba(255,255,255,.15);display:inline-block;vertical-align:middle}
+.sym-cell{font-family:monospace;font-weight:bold;font-size:13px;text-align:center}
+.dmc-remap{cursor:pointer;text-decoration:underline dotted;color:var(--accent)}
+
+/* BG picker overlay */
+#bg-pick-overlay{position:absolute;top:0;left:0;right:0;bottom:0;cursor:crosshair;z-index:10;display:none;background:rgba(0,0,0,.3)}
+#bg-pick-msg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.8);color:#fff;padding:12px 20px;border-radius:8px;text-align:center;pointer-events:none}
+
+/* Modal */
+#modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}
+#modal-overlay.show{display:flex}
+#modal-box{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:20px;min-width:320px;max-width:480px}
+#modal-box h2{font-size:14px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+#remap-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;max-height:320px;overflow-y:auto;margin:10px 0}
+.remap-item{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--border);border-radius:3px;cursor:pointer;font-size:11px}
+.remap-item:hover{background:var(--accent);border-color:var(--accent)}
+.remap-item .sw{width:16px;height:16px;border-radius:2px;flex-shrink:0}
+.remap-search{width:100%;margin-bottom:8px}
+
+/* Progress overlay */
+#work-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+#work-overlay.show{display:flex}
+#work-spinner{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#work-msg{color:#fff;font-size:14px}
+#work-sub{color:var(--fg2);font-size:12px}
+
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div id="progress-bar"></div>
+
+<div id="toolbar">
+  <button id="btn-load">📂 Load Image</button>
+  <div class="sep"></div>
+  <button id="btn-analyze" class="primary" disabled>⚙ Analyse</button>
+  <div class="sep"></div>
+  <button id="btn-png" disabled title="Export PNG">PNG</button>
+  <button id="btn-jpeg" disabled title="Export JPEG">JPEG</button>
+  <button id="btn-pdf" disabled title="Export PDF (tiled, printable)">PDF</button>
+  <button id="btn-csv" disabled title="Export shopping list CSV">🛒 CSV</button>
+  <div class="sep"></div>
+  <label style="font-size:11px;color:var(--fg2)">Page:</label>
+  <select id="pdf-size" style="width:70px">
+    <option value="a4">A4</option>
+    <option value="a3">A3</option>
+    <option value="letter">Letter</option>
+  </select>
+  <div class="sep"></div>
+  <div id="status">Load an image to begin →  File › Load Image or drag &amp; drop</div>
+</div>
+
+<div id="main">
+  <!-- LEFT PANEL -->
+  <div id="left-panel">
+    <div class="group">
+      <h3>Grid Size</h3>
+      <div class="row"><label>Width (stitches)</label>
+        <input type="number" id="grid-w" value="80" min="10" max="500" style="width:60px">
+      </div>
+      <div class="row"><label>Height (stitches)</label>
+        <input type="number" id="grid-h" value="100" min="10" max="500" style="width:60px">
+      </div>
+      <div class="row"><label>Lock aspect ratio</label>
+        <input type="checkbox" id="lock-aspect" checked>
+      </div>
+      <div class="row" style="flex-wrap:wrap;gap:4px">
+        <label style="flex-basis:100%">Presets (width):</label>
+        <button class="preset-w" data-w="40" style="flex:1">40</button>
+        <button class="preset-w" data-w="60" style="flex:1">60</button>
+        <button class="preset-w" data-w="90" style="flex:1">90</button>
+        <button class="preset-w" data-w="120" style="flex:1">120</button>
+        <button class="preset-w" data-w="180" style="flex:1">180</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Colors</h3>
+      <div class="row"><label>Number of colors</label>
+        <input type="number" id="num-colors" value="16" min="2" max="60" style="width:60px">
+      </div>
+      <div class="row" style="flex-wrap:wrap;gap:4px">
+        <label style="flex-basis:100%">Presets:</label>
+        <button class="preset-c" data-c="8" style="flex:1">Simple</button>
+        <button class="preset-c" data-c="16" style="flex:1">Standard</button>
+        <button class="preset-c" data-c="30" style="flex:1">Detailed</button>
+        <button class="preset-c" data-c="50" style="flex:1">Full</button>
+      </div>
+      <div class="slider-row" style="margin-top:6px">
+        <div class="top"><label>Merge threshold</label><span id="merge-val">10</span></div>
+        <input type="range" id="merge-thr" min="0" max="30" value="10" step="1">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Background Removal</h3>
+      <div class="row"><label>Method</label>
+        <select id="bg-method">
+          <option value="none">None</option>
+          <option value="tolerance" selected>Color tolerance</option>
+          <option value="ai">AI (auto-download)</option>
+        </select>
+      </div>
+      <div id="bg-tol-group">
+        <div class="slider-row">
+          <div class="top"><label>Tolerance</label><span id="tol-val">40</span></div>
+          <input type="range" id="bg-tol" min="0" max="150" value="40" step="1">
+        </div>
+        <button id="btn-pick-bg" style="width:100%">🎯 Pick Background Color</button>
+        <div class="row" style="margin-top:4px">
+          <span id="bg-color-swatch" style="width:20px;height:20px;border:1px solid var(--border);border-radius:3px;background:#fff;display:inline-block"></span>
+          <span id="bg-color-val" style="font-size:11px;color:var(--fg2)">Click image to sample</span>
+        </div>
+        <div class="row"><label>Corner flood-fill</label>
+          <input type="checkbox" id="use-flood" checked>
+        </div>
+      </div>
+      <div id="bg-ai-group" style="display:none">
+        <p style="font-size:11px;color:var(--fg2);margin-top:4px">AI removal downloads ~50 MB on first use. Works best for photos with clear subjects.</p>
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Image Adjustments</h3>
+      <div class="slider-row">
+        <div class="top"><label>Brightness</label><span id="bright-val">0</span></div>
+        <input type="range" id="brightness" min="-100" max="100" value="0">
+      </div>
+      <div class="slider-row">
+        <div class="top"><label>Contrast</label><span id="contrast-val">0</span></div>
+        <input type="range" id="contrast" min="-100" max="100" value="0">
+      </div>
+      <div class="slider-row">
+        <div class="top"><label>Saturation</label><span id="sat-val">0</span></div>
+        <input type="range" id="saturation" min="-100" max="100" value="0">
+      </div>
+      <div class="slider-row">
+        <div class="top"><label>Sharpness</label><span id="sharp-val">0</span></div>
+        <input type="range" id="sharpness" min="0" max="100" value="0">
+      </div>
+      <div class="slider-row">
+        <div class="top"><label>Blur</label><span id="blur-val">0</span></div>
+        <input type="range" id="blur" min="0" max="10" value="0" step="0.5">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Display</h3>
+      <div class="row"><label>Show grid lines</label>
+        <input type="checkbox" id="show-grid" checked>
+      </div>
+      <div class="row"><label>Show symbols</label>
+        <input type="checkbox" id="show-symbols" checked>
+      </div>
+      <div class="row"><label>Show center marks</label>
+        <input type="checkbox" id="show-center" checked>
+      </div>
+      <div class="row"><label>Cell size (px)</label>
+        <input type="number" id="cell-size" value="16" min="6" max="40" style="width:60px">
+      </div>
+    </div>
+
+    <div class="group" style="border-bottom:none">
+      <h3>Fabric Size Estimate</h3>
+      <div id="fabric-info" style="font-size:11px;color:var(--fg2);line-height:1.8">
+        Analyse an image first.
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER PANEL -->
+  <div id="center">
+    <div id="source-bar">
+      <div id="source-img-wrap">
+        <img id="source-img" alt="Source">
+        <div id="source-placeholder">No image</div>
+      </div>
+      <div style="flex:1;font-size:11px;color:var(--fg2)">
+        <div id="img-info">Load an image to get started</div>
+        <div style="margin-top:3px;color:var(--fg2)">Drag &amp; drop an image anywhere</div>
+      </div>
+    </div>
+    <div id="canvas-wrap">
+      <canvas id="pattern-canvas"></canvas>
+      <div id="bg-pick-overlay">
+        <div id="bg-pick-msg">Click on the background area of the image<br><small>Press Escape to cancel</small></div>
+      </div>
+      <div id="canvas-info">No pattern</div>
+      <div id="zoom-controls">
+        <button id="btn-zout" title="Zoom out">−</button>
+        <button id="btn-zfit" title="Fit to window">⊡</button>
+        <button id="btn-zin" title="Zoom in">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="right-panel">
+    <div id="legend-stats">Analyse an image to see the color palette.</div>
+    <div id="legend-table-wrap">
+      <table id="legend-table">
+        <thead>
+          <tr>
+            <th style="width:24px"></th>
+            <th style="width:22px">Sym</th>
+            <th>DMC</th>
+            <th>Name</th>
+            <th style="width:50px">Sts</th>
+            <th style="width:40px">Sk</th>
+          </tr>
+        </thead>
+        <tbody id="legend-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept="image/*" style="display:none">
+<canvas id="work-canvas" style="display:none"></canvas>
+
+<!-- Working overlay -->
+<div id="work-overlay">
+  <div id="work-spinner"></div>
+  <div id="work-msg">Analysing…</div>
+  <div id="work-sub"></div>
+</div>
+
+<!-- Remap modal -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <h2>Remap Color</h2>
+    <div id="remap-current" style="margin-bottom:10px;font-size:12px"></div>
+    <input type="text" id="remap-search" class="remap-search" placeholder="Search DMC name or number…">
+    <div id="remap-grid"></div>
+    <div class="modal-btns">
+      <button id="modal-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+'use strict';
+
+// ================================================================
+// SYMBOLS (72 unique printable chars for pattern chart)
+// ================================================================
+const SYMBOLS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&*+=~?!^<>';
+
+// ================================================================
+// COLOR ENGINE
+// ================================================================
+function srgbLinear(c){c/=255;return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4);}
+function rgbToLab(r,g,b){
+  const R=srgbLinear(r),G=srgbLinear(g),B=srgbLinear(b);
+  let X=R*0.4124564+G*0.3575761+B*0.1804375;
+  let Y=R*0.2126729+G*0.7151522+B*0.0721750;
+  let Z=R*0.0193339+G*0.1191920+B*0.9503041;
+  const fn=t=>t>0.008856?Math.cbrt(t):7.787*t+16/116;
+  const fx=fn(X/0.95047),fy=fn(Y),fz=fn(Z/1.08883);
+  return[116*fy-16,500*(fx-fy),200*(fy-fz)];
+}
+function ciede2000(l1,l2){
+  const[L1,a1,b1]=l1,[L2,a2,b2]=l2,PI=Math.PI,deg=PI/180;
+  const C1=Math.sqrt(a1*a1+b1*b1),C2=Math.sqrt(a2*a2+b2*b2);
+  const Cab=(C1+C2)/2,Cab7=Cab**7;
+  const G=0.5*(1-Math.sqrt(Cab7/(Cab7+25**7)));
+  const a1p=a1*(1+G),a2p=a2*(1+G);
+  const C1p=Math.sqrt(a1p**2+b1**2),C2p=Math.sqrt(a2p**2+b2**2);
+  let h1p=Math.atan2(b1,a1p)*180/PI; if(h1p<0)h1p+=360;
+  let h2p=Math.atan2(b2,a2p)*180/PI; if(h2p<0)h2p+=360;
+  const dLp=L2-L1,dCp=C2p-C1p;
+  let dhp=0;
+  if(C1p*C2p!==0){
+    if(Math.abs(h2p-h1p)<=180)dhp=h2p-h1p;
+    else if(h2p-h1p>180)dhp=h2p-h1p-360;
+    else dhp=h2p-h1p+360;
+  }
+  const dHp=2*Math.sqrt(C1p*C2p)*Math.sin(dhp/2*deg);
+  const Lpm=(L1+L2)/2,Cpm=(C1p+C2p)/2;
+  let hpm;
+  if(C1p*C2p===0)hpm=h1p+h2p;
+  else if(Math.abs(h1p-h2p)<=180)hpm=(h1p+h2p)/2;
+  else if(h1p+h2p<360)hpm=(h1p+h2p+360)/2;
+  else hpm=(h1p+h2p-360)/2;
+  const T=1-0.17*Math.cos((hpm-30)*deg)+0.24*Math.cos(2*hpm*deg)
+           +0.32*Math.cos((3*hpm+6)*deg)-0.20*Math.cos((4*hpm-63)*deg);
+  const SL=1+0.015*(Lpm-50)**2/Math.sqrt(20+(Lpm-50)**2);
+  const SC=1+0.045*Cpm,SH=1+0.015*Cpm*T;
+  const Cpm7=Cpm**7,RC=2*Math.sqrt(Cpm7/(Cpm7+25**7));
+  const dT=30*Math.exp(-(((hpm-275)/25)**2))*deg;
+  const RT=-Math.sin(2*dT)*RC;
+  return Math.sqrt((dLp/SL)**2+(dCp/SC)**2+(dHp/SH)**2+RT*(dCp/SC)*(dHp/SH));
+}
+
+// ================================================================
+// DMC MATCHER (pre-compute LAB for all entries)
+// ================================================================
+class DMCMatcher {
+  constructor(){
+    this._list=[];
+    for(const[num,v] of Object.entries(DMC)){
+      this._list.push({num,name:v.n,rgb:[v.r,v.g,v.b],lab:rgbToLab(v.r,v.g,v.b)});
+    }
+  }
+  match(r,g,b){
+    const lab=rgbToLab(r,g,b);
+    let best=this._list[0],bd=Infinity;
+    for(const e of this._list){const d=ciede2000(lab,e.lab);if(d<bd){bd=d;best=e;}}
+    return{...best,dist:bd};
+  }
+}
+const matcher=new DMCMatcher();
+
+// ================================================================
+// KMEANS (KMeans++ init, seed=42)
+// ================================================================
+function kmeans(data,k,maxIter=50){
+  if(!data.length||k<1)return{centers:[],labels:new Int32Array(0)};
+  k=Math.min(k,data.length);
+  const dim=data[0].length,n=data.length;
+  // LCG RNG seed=42
+  let s=42;
+  const rng=()=>{s=(s*1664525+1013904223)&0xFFFFFFFF;return(s>>>0)/0x100000000;};
+  // KMeans++ init
+  const centers=[data[Math.floor(rng()*n)].slice()];
+  while(centers.length<k){
+    const dists=data.map(p=>{
+      let md=Infinity;
+      for(const c of centers){let d=0;for(let i=0;i<dim;i++)d+=(p[i]-c[i])**2;md=Math.min(md,d);}
+      return md;
+    });
+    const tot=dists.reduce((a,b)=>a+b,0);
+    let r=rng()*tot,acc=0;
+    for(let i=0;i<n;i++){acc+=dists[i];if(acc>=r){centers.push(data[i].slice());break;}}
+    if(centers.length<k)centers.push(data[Math.floor(rng()*n)].slice());
+  }
+  const labels=new Int32Array(n);
+  for(let iter=0;iter<maxIter;iter++){
+    let changed=false;
+    for(let i=0;i<n;i++){
+      let bj=0,bd=Infinity;
+      for(let j=0;j<k;j++){let d=0;for(let m=0;m<dim;m++)d+=(data[i][m]-centers[j][m])**2;if(d<bd){bd=d;bj=j;}}
+      if(labels[i]!==bj){labels[i]=bj;changed=true;}
+    }
+    if(!changed)break;
+    const sums=Array.from({length:k},()=>new Float64Array(dim));
+    const cnts=new Int32Array(k);
+    for(let i=0;i<n;i++){for(let m=0;m<dim;m++)sums[labels[i]][m]+=data[i][m];cnts[labels[i]]++;}
+    for(let j=0;j<k;j++)if(cnts[j])for(let m=0;m<dim;m++)centers[j][m]=sums[j][m]/cnts[j];
+  }
+  return{centers:centers.map(c=>Array.from(c)),labels};
+}
+
+// ================================================================
+// IMAGE ADJUSTMENTS (brightness, contrast, saturation, sharpness)
+// ================================================================
+function adjustImage(srcCanvas, brightness, contrast, saturation, sharpness, blur){
+  const w=srcCanvas.width,h=srcCanvas.height;
+  const dst=document.createElement('canvas');dst.width=w;dst.height=h;
+  const ctx=dst.getContext('2d');
+
+  // Apply CSS-filter-based transforms via offscreen canvas (fast)
+  // Build filter string
+  const bv=1+brightness/100, cv=1+contrast/100, sv=1+saturation/100;
+  const blurPx=blur>0?`blur(${blur}px)`:'';
+  ctx.filter=[
+    `brightness(${bv})`,
+    `contrast(${cv})`,
+    `saturate(${sv})`,
+    blurPx
+  ].filter(Boolean).join(' ');
+  ctx.drawImage(srcCanvas,0,0);
+  ctx.filter='none';
+
+  // Sharpness via unsharp mask (only if > 0)
+  if(sharpness>0){
+    const strength=sharpness/100*1.5;
+    const id=ctx.getImageData(0,0,w,h);
+    const src=new Uint8ClampedArray(id.data);
+    const dst2=id.data;
+    const k=[-1,-1,-1,-1,8+1/strength,-1,-1,-1,-1]; // approx sharpen
+    // Simple 3x3 convolution
+    for(let y=1;y<h-1;y++){
+      for(let x=1;x<w-1;x++){
+        const i=(y*w+x)*4;
+        if(src[i+3]<10)continue;
+        for(let c=0;c<3;c++){
+          let v=0;
+          for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+            v+=src[((y+dy)*w+(x+dx))*4+c]*k[(dy+1)*3+(dx+1)];
+          }
+          dst2[i+c]=Math.max(0,Math.min(255,v*strength+src[i+c]*(1-strength)));
+        }
+      }
+    }
+    ctx.putImageData(id,0,0);
+  }
+  return dst;
+}
+
+// ================================================================
+// BACKGROUND REMOVAL – COLOR TOLERANCE
+// ================================================================
+function removeBgTolerance(srcCanvas, bgR, bgG, bgB, tolerance, useFlood){
+  const w=srcCanvas.width,h=srcCanvas.height;
+  const dst=document.createElement('canvas');dst.width=w;dst.height=h;
+  const dctx=dst.getContext('2d');
+  dctx.drawImage(srcCanvas,0,0);
+  const id=dctx.getImageData(0,0,w,h);
+  const d=id.data;
+  const tol2=tolerance*tolerance;
+
+  function colorDist2(r,g,b){return(r-bgR)**2+(g-bgG)**2+(b-bgB)**2;}
+
+  if(useFlood){
+    // Flood fill from 4 corners
+    const visited=new Uint8Array(w*h);
+    const queue=[];
+    function tryAdd(x,y){
+      if(x<0||x>=w||y<0||y>=h)return;
+      const idx=y*w+x;
+      if(visited[idx])return;
+      const pi=idx*4;
+      if(d[pi+3]<10||colorDist2(d[pi],d[pi+1],d[pi+2])<=tol2){
+        visited[idx]=1;queue.push([x,y]);
+      }
+    }
+    tryAdd(0,0);tryAdd(w-1,0);tryAdd(0,h-1);tryAdd(w-1,h-1);
+    while(queue.length){
+      const[x,y]=queue.pop();
+      const pi=(y*w+x)*4;d[pi+3]=0;
+      tryAdd(x+1,y);tryAdd(x-1,y);tryAdd(x,y+1);tryAdd(x,y-1);
+    }
+  } else {
+    // Global threshold
+    for(let i=0;i<w*h;i++){
+      const p=i*4;
+      if(colorDist2(d[p],d[p+1],d[p+2])<=tol2)d[p+3]=0;
+    }
+  }
+  dctx.putImageData(id,0,0);
+  return dst;
+}
+
+// ================================================================
+// AI BACKGROUND REMOVAL via @imgly/background-removal
+// ================================================================
+let _bgLib=null;
+async function loadBgLib(){
+  if(_bgLib)return _bgLib;
+  try{
+    // Dynamic ESM import
+    const mod=await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/background-removal.mjs');
+    _bgLib=mod;return mod;
+  }catch(e){console.warn('bg-removal lib failed:',e);return null;}
+}
+
+async function removeBgAI(imgEl, onProgress){
+  const lib=await loadBgLib();
+  if(!lib)throw new Error('AI background removal library could not be loaded. Try Color Tolerance instead.');
+  const c=document.createElement('canvas');
+  c.width=imgEl.naturalWidth;c.height=imgEl.naturalHeight;
+  c.getContext('2d').drawImage(imgEl,0,0);
+  const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+  const resultBlob=await lib.removeBackground(blob,{
+    progress:(key,cur,tot)=>onProgress&&onProgress(`${key}: ${Math.round(cur/tot*100)}%`)
+  });
+  const url=URL.createObjectURL(resultBlob);
+  const img=new Image();
+  await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url;});
+  // Convert to canvas
+  const rc=document.createElement('canvas');rc.width=img.naturalWidth;rc.height=img.naturalHeight;
+  rc.getContext('2d').drawImage(img,0,0);
+  URL.revokeObjectURL(url);
+  return rc;
+}
+
+// ================================================================
+// PATTERN ENGINE
+// ================================================================
+async function buildPattern(sourceImg, opts, onProgress){
+  const{gridW,gridH,numColors,mergeThr,bgMethod,bgR,bgG,bgB,bgTol,useFlood,
+        brightness,contrast,saturation,sharpness,blur}=opts;
+
+  onProgress('Loading image…',5);
+  // Draw source to work canvas at full res
+  const wc=document.getElementById('work-canvas');
+  wc.width=sourceImg.naturalWidth;wc.height=sourceImg.naturalHeight;
+  const wctx=wc.getContext('2d');
+  wctx.drawImage(sourceImg,0,0);
+
+  onProgress('Applying adjustments…',15);
+  let workCanvas=adjustImage(wc,brightness,contrast,saturation,sharpness,blur);
+
+  // Background removal
+  if(bgMethod==='ai'){
+    onProgress('Running AI background removal…',20);
+    try{
+      const tmp=new Image();tmp.src=workCanvas.toDataURL();
+      await new Promise(r=>{tmp.onload=r;});
+      workCanvas=await removeBgAI(tmp,msg=>onProgress(msg,30));
+    }catch(e){onProgress('AI failed, using tolerance…',30);}
+  }
+
+  onProgress('Resizing to grid…',35);
+  // Resize to grid dimensions
+  const gridCanvas=document.createElement('canvas');
+  gridCanvas.width=gridW;gridCanvas.height=gridH;
+  const gctx=gridCanvas.getContext('2d');
+  gctx.imageSmoothingEnabled=true;
+  gctx.imageSmoothingQuality='high';
+  gctx.drawImage(workCanvas,0,0,gridW,gridH);
+
+  // Apply tolerance BG removal on the resized grid
+  let finalCanvas=gridCanvas;
+  if(bgMethod==='tolerance'){
+    onProgress('Removing background…',40);
+    finalCanvas=removeBgTolerance(gridCanvas,bgR,bgG,bgB,bgTol*gridW/workCanvas.width||bgTol,useFlood);
+    // also run on work-size for better edge accuracy  
+    workCanvas=removeBgTolerance(workCanvas,bgR,bgG,bgB,bgTol,useFlood);
+    finalCanvas=document.createElement('canvas');finalCanvas.width=gridW;finalCanvas.height=gridH;
+    const fc=finalCanvas.getContext('2d');fc.imageSmoothingEnabled=true;fc.imageSmoothingQuality='high';
+    fc.drawImage(workCanvas,0,0,gridW,gridH);
+  }
+
+  onProgress('Extracting pixels…',45);
+  const id=finalCanvas.getContext('2d').getImageData(0,0,gridW,gridH);
+  const px=id.data;
+
+  // Alpha mask + opaque pixel list
+  const alphaMask=new Uint8Array(gridW*gridH);
+  const opaquePixels=[],opaqueIdx=[];
+  for(let i=0;i<gridW*gridH;i++){
+    if(px[i*4+3]>30){
+      alphaMask[i]=1;
+      opaquePixels.push([px[i*4],px[i*4+1],px[i*4+2]]);
+      opaqueIdx.push(i);
+    }
+  }
+  if(!opaquePixels.length)throw new Error('No opaque pixels found. Try a different background removal method.');
+
+  onProgress('Clustering colors…',50);
+  const{centers,labels}=kmeans(opaquePixels,numColors);
+
+  onProgress('Matching to DMC…',70);
+  // Match cluster centers to DMC
+  const dmcMatches=centers.map(([r,g,b])=>matcher.match(r,g,b));
+
+  // Deduplicate: multiple clusters may map to same DMC number
+  // Use Union-Find style merge
+  const numMap=new Map(); // dmc.num → first cluster idx
+  const redirect=new Int32Array(centers.length).fill(-1);
+  for(let j=0;j<centers.length;j++){
+    const num=dmcMatches[j].num;
+    if(numMap.has(num)){redirect[j]=numMap.get(num);}
+    else{numMap.set(num,j);}
+  }
+
+  // Apply merge threshold (CIEDE2000)
+  if(mergeThr>0){
+    for(let a=0;a<centers.length;a++){
+      const ra=redirect[a]>=0?redirect[a]:a;
+      for(let b=a+1;b<centers.length;b++){
+        const rb=redirect[b]>=0?redirect[b]:b;
+        if(ra===rb)continue;
+        const da=dmcMatches[ra],db=dmcMatches[rb];
+        if(ciede2000(da.lab,db.lab)<=mergeThr){redirect[b]=ra;}
+      }
+    }
+  }
+
+  // Build final unique palette list
+  const paletteMap=new Map(); // dmc.num → palette entry
+  for(let j=0;j<centers.length;j++){
+    const rj=redirect[j]>=0?redirect[j]:j;
+    const dm=dmcMatches[rj];
+    if(!paletteMap.has(dm.num))paletteMap.set(dm.num,{...dm,idx:paletteMap.size});
+  }
+  const palette=Array.from(paletteMap.values());
+  palette.sort((a,b)=>{ // sort by brightness
+    const la=rgbToLab(a.rgb[0],a.rgb[1],a.rgb[2]);
+    const lb=rgbToLab(b.rgb[0],b.rgb[1],b.rgb[2]);
+    return la[0]-lb[0];
+  });
+  palette.forEach((e,i)=>{e.idx=i;paletteMap.get(e.num).idx=i;});
+
+  // Assign symbols
+  const symbolMap={};
+  palette.forEach((e,i)=>{symbolMap[e.num]=SYMBOLS[i%SYMBOLS.length];});
+
+  // Build grid
+  onProgress('Building grid…',85);
+  const grid=new Int32Array(gridW*gridH).fill(-1);
+  const stitchCounts={};
+  palette.forEach(e=>{stitchCounts[e.num]=0;});
+
+  for(let li=0;li<opaqueIdx.length;li++){
+    const ci=labels[li];
+    const rci=redirect[ci]>=0?redirect[ci]:ci;
+    const dm=dmcMatches[rci];
+    const pe=paletteMap.get(dm.num);
+    grid[opaqueIdx[li]]=pe.idx;
+    stitchCounts[dm.num]=(stitchCounts[dm.num]||0)+1;
+  }
+
+  onProgress('Done!',100);
+  return{grid,gridW,gridH,palette,symbolMap,stitchCounts,alphaMask};
+}
+</script>
+<script>
+const DMC={
+  'B5200':{n:'Snow White',r:255,g:255,b:255},
+  'ECRU':{n:'Ecru',r:240,g:234,b:218},
+  'White':{n:'White',r:252,g:251,b:248},
+  '48':{n:'White Flower',r:255,g:248,b:248},
+  '51':{n:'VariegatedDusty Rose',r:217,g:168,b:168},
+  '52':{n:'Variegated Violet',r:180,g:160,b:190},
+  '53':{n:'Variegated Steel Gray',r:170,g:170,b:175},
+  '57':{n:'Variegated Passion Flower',r:180,g:130,b:160},
+  '61':{n:'Variegated Mocha',r:190,g:160,b:130},
+  '62':{n:'Variegated Khaki',r:180,g:170,b:130},
+  '67':{n:'Variegated Baby Blue',r:180,g:205,b:225},
+  '69':{n:'Variegated Amber Waves',r:215,g:175,b:90},
+  '75':{n:'Variegated Pink Burst',r:240,g:160,b:170},
+  '90':{n:'Variegated Aquamarine',r:140,g:195,b:185},
+  '91':{n:'Variegated Spring Green',r:150,g:200,b:140},
+  '92':{n:'Variegated Peach Cobbler',r:240,g:190,b:150},
+  '93':{n:'Variegated Ocean Breeze',r:140,g:185,b:205},
+  '94':{n:'Variegated Green Ice',r:160,g:210,b:180},
+  '95':{n:'Variegated Blue Bayou',r:130,g:155,b:200},
+  '99':{n:'Variegated Sunrise',r:240,g:200,b:120},
+  '100':{n:'Variegated Sheer Lilac',r:215,g:195,b:225},
+  '101':{n:'Variegated Caribbean Sea',r:80,g:165,b:185},
+  '102':{n:'Variegated Tangelo',r:235,g:140,b:80},
+  '103':{n:'Variegated China Blue',r:100,g:130,b:185},
+  '104':{n:'Variegated Pansy',r:140,g:90,b:155},
+  '105':{n:'Variegated Seascape',r:90,g:155,b:170},
+  '106':{n:'Variegated Flowers',r:200,g:130,b:120},
+  '107':{n:'Variegated Wild Flowers',r:160,g:100,b:150},
+  '108':{n:'Variegated Lavender',r:175,g:165,b:210},
+  '111':{n:'Variegated Onyx',r:80,g:70,b:75},
+  '112':{n:'Variegated Jewel Box',r:120,g:100,b:170},
+  '113':{n:'Variegated Earthen Tones',r:165,g:130,b:90},
+  '114':{n:'Variegated Honey',r:210,g:175,b:90},
+  '115':{n:'Variegated Garnet',r:165,g:50,b:70},
+  '116':{n:'Variegated Sunrise Red',r:210,g:100,b:80},
+  '121':{n:'Variegated Delphi',r:100,g:130,b:195},
+  '122':{n:'Variegated Sky Blue',r:150,g:190,b:225},
+  '123':{n:'Variegated Robin Red Breast',r:200,g:120,b:80},
+  '124':{n:'Variegated Royal Garden',r:100,g:85,b:145},
+  '125':{n:'Variegated Autumn Leaves',r:195,g:140,b:70},
+  '150':{n:'Dusty Rose Ultra Vy Dk',r:171,g:31,b:69},
+  '151':{n:'Dusty Rose Vry Lt',r:230,g:195,b:205},
+  '152':{n:'Shell Pink Med Lt',r:218,g:158,b:152},
+  '153':{n:'Violet Very Light',r:221,g:185,b:210},
+  '154':{n:'Grape Very Dark',r:88,g:37,b:69},
+  '155':{n:'Blue Violet Med Dk',r:154,g:150,b:197},
+  '156':{n:'Blue Violet Med Lt',r:175,g:183,b:220},
+  '157':{n:'Cornflower Blue Vy Lt',r:185,g:192,b:220},
+  '158':{n:'Cornflower Bl Med Vy Dk',r:87,g:89,b:128},
+  '159':{n:'Blue Gray Light',r:183,g:191,b:210},
+  '160':{n:'Blue Gray Medium',r:141,g:158,b:191},
+  '161':{n:'Blue Gray',r:108,g:126,b:170},
+  '162':{n:'Blue Ultra Very Light',r:210,g:228,b:241},
+  '163':{n:'Celadon Green Med',r:102,g:155,b:127},
+  '164':{n:'Forest Green Light',r:171,g:205,b:170},
+  '165':{n:'Moss Green Vy Lt',r:234,g:242,b:174},
+  '166':{n:'Moss Green Med Lt',r:197,g:218,b:106},
+  '167':{n:'Yellow Beige Vy Dk',r:177,g:137,b:82},
+  '168':{n:'Pewter Very Light',r:201,g:202,b:205},
+  '169':{n:'Pewter Light',r:155,g:157,b:161},
+  '208':{n:'Lavender Very Dark',r:133,g:81,b:151},
+  '209':{n:'Lavender Dark',r:167,g:119,b:183},
+  '210':{n:'Lavender Medium',r:200,g:163,b:210},
+  '211':{n:'Lavender Light',r:224,g:203,b:231},
+  '221':{n:'Shell Pink Very Dark',r:166,g:86,b:90},
+  '222':{n:'Shell Pink Light',r:210,g:158,b:155},
+  '223':{n:'Shell Pink Medium',r:200,g:130,b:128},
+  '224':{n:'Shell Pink Very Light',r:230,g:185,b:178},
+  '225':{n:'Shell Pink Ultra Vy Lt',r:245,g:218,b:210},
+  '300':{n:'Mahogany Very Dark',r:130,g:57,b:13},
+  '301':{n:'Mahogany Medium',r:184,g:105,b:50},
+  '304':{n:'Christmas Red Med',r:175,g:31,b:50},
+  '307':{n:'Lemon',r:253,g:235,b:99},
+  '309':{n:'Rose Dark',r:195,g:64,b:90},
+  '310':{n:'Black',r:25,g:25,b:25},
+  '311':{n:'Navy Blue Med',r:37,g:73,b:118},
+  '312':{n:'Baby Blue Light',r:64,g:112,b:162},
+  '315':{n:'Antique Mauve Med Dk',r:152,g:85,b:100},
+  '316':{n:'Antique Mauve Medium',r:192,g:126,b:143},
+  '317':{n:'Pewter Gray',r:117,g:111,b:117},
+  '318':{n:'Steel Gray Light',r:165,g:167,b:168},
+  '319':{n:'Pistachio Green Vy Dk',r:63,g:100,b:66},
+  '320':{n:'Pistachio Green Med',r:106,g:144,b:95},
+  '321':{n:'Christmas Red',r:195,g:37,b:54},
+  '322':{n:'Navy Blue Dark',r:79,g:126,b:181},
+  '326':{n:'Rose Very Dark',r:193,g:59,b:82},
+  '327':{n:'Violet Dark',r:101,g:44,b:100},
+  '333':{n:'Blue Violet Very Dark',r:82,g:73,b:140},
+  '334':{n:'Baby Blue Medium',r:107,g:162,b:205},
+  '335':{n:'Rose',r:228,g:79,b:114},
+  '336':{n:'Navy Blue',r:33,g:65,b:107},
+  '340':{n:'Blue Violet Medium',r:155,g:153,b:204},
+  '341':{n:'Blue Violet Light',r:175,g:181,b:221},
+  '347':{n:'Salmon Very Dark',r:192,g:53,b:47},
+  '349':{n:'Coral Dark',r:199,g:46,b:42},
+  '350':{n:'Coral Medium',r:213,g:78,b:66},
+  '351':{n:'Coral',r:226,g:120,b:102},
+  '352':{n:'Coral Light',r:237,g:163,b:145},
+  '353':{n:'Peach',r:249,g:199,b:177},
+  '355':{n:'Terra Cotta Dark',r:156,g:75,b:53},
+  '356':{n:'Terra Cotta Medium',r:193,g:108,b:78},
+  '367':{n:'Pistachio Green Dk',r:89,g:124,b:82},
+  '368':{n:'Pistachio Green Lt',r:152,g:193,b:143},
+  '369':{n:'Pistachio Green Vy Lt',r:198,g:229,b:190},
+  '370':{n:'Mustard Medium',r:176,g:146,b:72},
+  '371':{n:'Mustard',r:187,g:162,b:82},
+  '372':{n:'Mustard Light',r:204,g:182,b:107},
+  '400':{n:'Mahogany Dark',r:163,g:76,b:29},
+  '402':{n:'Mahogany Very Light',r:238,g:175,b:128},
+  '407':{n:'Desert Sand Med',r:186,g:130,b:98},
+  '413':{n:'Pewter Gray Dark',r:88,g:83,b:86},
+  '414':{n:'Steel Gray Dark',r:137,g:133,b:134},
+  '415':{n:'Pearl Gray',r:212,g:212,b:212},
+  '420':{n:'Hazel Nut Brown Dk',r:155,g:117,b:64},
+  '422':{n:'Hazel Nut Brown Lt',r:200,g:164,b:113},
+  '433':{n:'Brown Medium',r:140,g:80,b:29},
+  '434':{n:'Brown Light',r:176,g:106,b:49},
+  '435':{n:'Brown Very Light',r:193,g:125,b:63},
+  '436':{n:'Tan',r:210,g:155,b:82},
+  '437':{n:'Tan Light',r:232,g:190,b:134},
+  '444':{n:'Lemon Dark',r:251,g:215,b:0},
+  '445':{n:'Lemon Light',r:255,g:250,b:161},
+  '451':{n:'Shell Gray Dark',r:148,g:131,b:127},
+  '452':{n:'Shell Gray Medium',r:187,g:174,b:168},
+  '453':{n:'Shell Gray Light',r:210,g:200,b:194},
+  '469':{n:'Avocado Green',r:107,g:120,b:48},
+  '470':{n:'Avocado Grn Lt',r:136,g:160,b:66},
+  '471':{n:'Avocado Grn Vy Lt',r:165,g:190,b:93},
+  '472':{n:'Avocado Grn Ultra Lt',r:211,g:226,b:140},
+  '498':{n:'Christmas Red Dk',r:163,g:20,b:47},
+  '500':{n:'Blue Green Very Dark',r:42,g:78,b:57},
+  '501':{n:'Blue Green Dark',r:67,g:108,b:84},
+  '502':{n:'Blue Green',r:99,g:143,b:118},
+  '503':{n:'Blue Green Medium',r:140,g:179,b:157},
+  '504':{n:'Blue Green Light',r:176,g:208,b:194},
+  '505':{n:'Jade Green',r:57,g:145,b:105},
+  '517':{n:'Wedgwood Dark',r:56,g:116,b:154},
+  '518':{n:'Wedgwood Light',r:78,g:151,b:181},
+  '519':{n:'Sky Blue',r:119,g:183,b:211},
+  '520':{n:'Fern Green Dark',r:88,g:105,b:70},
+  '522':{n:'Fern Green',r:138,g:153,b:118},
+  '523':{n:'Fern Green Light',r:162,g:175,b:143},
+  '524':{n:'Fern Green Vy Lt',r:193,g:206,b:177},
+  '535':{n:'Ash Gray Very Light',r:91,g:93,b:96},
+  '543':{n:'Beige Brown Ultra Vy Lt',r:235,g:220,b:203},
+  '550':{n:'Violet Very Dark',r:96,g:31,b:97},
+  '552':{n:'Violet Medium',r:138,g:73,b:140},
+  '553':{n:'Violet',r:159,g:100,b:163},
+  '554':{n:'Violet Light',r:209,g:168,b:213},
+  '561':{n:'Jade Very Dark',r:44,g:112,b:80},
+  '562':{n:'Jade Medium',r:77,g:150,b:114},
+  '563':{n:'Jade Light',r:128,g:188,b:158},
+  '564':{n:'Jade Very Light',r:165,g:210,b:188},
+  '580':{n:'Moss Green Dk',r:103,g:116,b:32},
+  '581':{n:'Moss Green',r:136,g:150,b:46},
+  '597':{n:'Turquoise',r:81,g:170,b:182},
+  '598':{n:'Turquoise Light',r:133,g:200,b:212},
+  '600':{n:'Cranberry Very Dark',r:198,g:37,b:96},
+  '601':{n:'Cranberry Dark',r:210,g:45,b:107},
+  '602':{n:'Cranberry Medium',r:222,g:78,b:128},
+  '603':{n:'Cranberry',r:243,g:124,b:161},
+  '604':{n:'Cranberry Light',r:252,g:170,b:195},
+  '605':{n:'Cranberry Very Light',r:255,g:202,b:220},
+  '606':{n:'Bright Orange Red',r:238,g:34,b:33},
+  '608':{n:'Bright Orange',r:240,g:113,b:51},
+  '610':{n:'Drab Brown Vy Dk',r:131,g:100,b:55},
+  '611':{n:'Drab Brown Dark',r:156,g:121,b:69},
+  '612':{n:'Drab Brown Medium',r:191,g:160,b:104},
+  '613':{n:'Drab Brown Light',r:222,g:198,b:151},
+  '632':{n:'Desert Sand Ult Vy Dk',r:152,g:89,b:56},
+  '640':{n:'Beige Gray Vy Dk',r:134,g:124,b:105},
+  '642':{n:'Beige Gray Dark',r:163,g:153,b:131},
+  '644':{n:'Beige Gray Medium',r:207,g:200,b:180},
+  '645':{n:'Beaver Gray Vy Dk',r:119,g:114,b:107},
+  '646':{n:'Beaver Gray Dark',r:143,g:137,b:128},
+  '647':{n:'Beaver Gray Med',r:168,g:162,b:152},
+  '648':{n:'Beaver Gray Light',r:196,g:190,b:182},
+  '666':{n:'Christmas Red Bright',r:230,g:46,b:57},
+  '676':{n:'Old Gold Light',r:226,g:199,b:134},
+  '677':{n:'Old Gold Very Light',r:241,g:229,b:183},
+  '680':{n:'Old Gold Dark',r:186,g:142,b:48},
+  '699':{n:'Christmas Green',r:28,g:103,b:33},
+  '700':{n:'Christmas Green Bright',r:31,g:121,b:38},
+  '701':{n:'Christmas Green Light',r:59,g:148,b:59},
+  '702':{n:'Kelly Green',r:78,g:166,b:68},
+  '703':{n:'Chartreuse',r:112,g:186,b:88},
+  '704':{n:'Chartreuse Bright',r:145,g:208,b:97},
+  '712':{n:'Cream',r:249,g:243,b:224},
+  '718':{n:'Plum',r:162,g:25,b:95},
+  '720':{n:'Orange Spice Dark',r:218,g:100,b:38},
+  '721':{n:'Orange Spice Medium',r:236,g:135,b:67},
+  '722':{n:'Orange Spice Light',r:247,g:171,b:108},
+  '725':{n:'Topaz',r:250,g:202,b:78},
+  '726':{n:'Topaz Light',r:252,g:218,b:104},
+  '727':{n:'Topaz Very Light',r:255,g:238,b:160},
+  '728':{n:'Golden Yellow',r:234,g:183,b:83},
+  '729':{n:'Old Gold Medium',r:206,g:163,b:62},
+  '730':{n:'Olive Green Vy Dk',r:126,g:115,b:26},
+  '731':{n:'Olive Green Dark',r:147,g:133,b:37},
+  '732':{n:'Olive Green',r:159,g:145,b:42},
+  '733':{n:'Olive Green Med',r:188,g:175,b:77},
+  '734':{n:'Olive Green Light',r:208,g:198,b:111},
+  '738':{n:'Tan Very Light',r:241,g:211,b:165},
+  '739':{n:'Tan Ultra Very Light',r:249,g:233,b:204},
+  '740':{n:'Tangerine',r:254,g:148,b:0},
+  '741':{n:'Tangerine Medium',r:254,g:168,b:26},
+  '742':{n:'Tangerine Light',r:254,g:196,b:67},
+  '743':{n:'Yellow Medium',r:254,g:218,b:97},
+  '744':{n:'Yellow Pale',r:254,g:232,b:140},
+  '745':{n:'Yellow Pale Light',r:255,g:243,b:187},
+  '746':{n:'Off White',r:250,g:247,b:229},
+  '747':{n:'Sky Blue Very Light',r:226,g:248,b:252},
+  '754':{n:'Peach Light',r:245,g:207,b:183},
+  '758':{n:'Terra Cotta Very Light',r:237,g:179,b:160},
+  '760':{n:'Salmon',r:243,g:163,b:149},
+  '761':{n:'Salmon Light',r:250,g:196,b:184},
+  '762':{n:'Pearl Gray Vy Lt',r:234,g:234,b:234},
+  '772':{n:'Pine Green Vy Lt',r:209,g:226,b:199},
+  '775':{n:'Baby Blue Very Light',r:208,g:229,b:243},
+  '776':{n:'Pink Medium',r:249,g:162,b:171},
+  '778':{n:'Antique Mauve Vy Lt',r:226,g:187,b:194},
+  '780':{n:'Topaz Ultra Vy Dk',r:154,g:102,b:18},
+  '781':{n:'Topaz Very Dark',r:174,g:120,b:29},
+  '782':{n:'Topaz Dark',r:196,g:141,b:42},
+  '783':{n:'Topaz Medium',r:214,g:165,b:64},
+  '791':{n:'Cornflower Blue Vy Dk',r:72,g:73,b:126},
+  '792':{n:'Cornflower Blue Dark',r:85,g:96,b:154},
+  '793':{n:'Cornflower Blue Med',r:107,g:124,b:178},
+  '794':{n:'Cornflower Blue Light',r:144,g:163,b:208},
+  '796':{n:'Royal Blue Dark',r:22,g:67,b:128},
+  '797':{n:'Royal Blue',r:30,g:84,b:157},
+  '798':{n:'Delft Blue Dark',r:56,g:106,b:168},
+  '799':{n:'Delft Blue Medium',r:87,g:133,b:192},
+  '800':{n:'Delft Blue Pale',r:173,g:200,b:227},
+  '801':{n:'Coffee Brown Dark',r:111,g:59,b:22},
+  '806':{n:'Peacock Blue Dark',r:47,g:148,b:170},
+  '807':{n:'Peacock Blue',r:80,g:178,b:196},
+  '809':{n:'Delft Blue',r:120,g:155,b:200},
+  '813':{n:'Blue Light',r:156,g:192,b:221},
+  '814':{n:'Garnet Dark',r:136,g:19,b:47},
+  '815':{n:'Garnet Medium',r:160,g:26,b:57},
+  '816':{n:'Garnet',r:182,g:36,b:61},
+  '817':{n:'Coral Red Very Dark',r:188,g:33,b:37},
+  '818':{n:'Baby Pink',r:255,g:218,b:221},
+  '819':{n:'Baby Pink Light',r:255,g:232,b:234},
+  '820':{n:'Royal Blue Very Dark',r:20,g:55,b:110},
+  '822':{n:'Beige Gray Light',r:228,g:221,b:203},
+  '823':{n:'Navy Blue Dark',r:29,g:39,b:100},
+  '824':{n:'Blue Very Dark',r:55,g:96,b:143},
+  '825':{n:'Blue Dark',r:68,g:117,b:168},
+  '826':{n:'Blue Medium',r:97,g:149,b:195},
+  '827':{n:'Blue Very Light',r:189,g:220,b:240},
+  '828':{n:'Sky Blue Ultra Vy Lt',r:208,g:238,b:246},
+  '829':{n:'Golden Olive Vy Dk',r:131,g:101,b:41},
+  '830':{n:'Golden Olive Dark',r:154,g:119,b:50},
+  '831':{n:'Golden Olive Med',r:179,g:143,b:64},
+  '832':{n:'Golden Olive',r:197,g:163,b:76},
+  '833':{n:'Golden Olive Light',r:216,g:187,b:106},
+  '834':{n:'Golden Olive Vy Lt',r:232,g:208,b:140},
+  '838':{n:'Beige Brown Vy Dk',r:88,g:62,b:37},
+  '839':{n:'Beige Brown Dark',r:107,g:75,b:45},
+  '840':{n:'Beige Brown Med',r:148,g:107,b:71},
+  '841':{n:'Beige Brown Light',r:189,g:157,b:121},
+  '842':{n:'Beige Brown Vy Lt',r:219,g:196,b:162},
+  '844':{n:'Beaver Gray Ultra Dk',r:77,g:74,b:71},
+  '869':{n:'Hazel Nut Brown Vy Dk',r:119,g:80,b:34},
+  '890':{n:'Pistachio Grn Ultra Dk',r:30,g:68,b:37},
+  '891':{n:'Carnation Dark',r:231,g:77,b:88},
+  '892':{n:'Carnation Medium',r:240,g:106,b:114},
+  '893':{n:'Carnation Light',r:248,g:143,b:148},
+  '894':{n:'Carnation Very Light',r:253,g:182,b:183},
+  '895':{n:'Hunter Green Very Dk',r:39,g:72,b:40},
+  '898':{n:'Coffee Brown Vy Dk',r:77,g:32,b:11},
+  '899':{n:'Rose Medium',r:237,g:108,b:132},
+  '900':{n:'Burnt Orange Dark',r:199,g:62,b:14},
+  '902':{n:'Garnet Very Dark',r:117,g:19,b:40},
+  '904':{n:'Parrot Green Vy Dk',r:79,g:118,b:33},
+  '905':{n:'Parrot Green Dark',r:103,g:147,b:43},
+  '906':{n:'Parrot Green Medium',r:132,g:180,b:60},
+  '907':{n:'Parrot Green Light',r:173,g:212,b:100},
+  '909':{n:'Emerald Green Vy Dk',r:19,g:114,b:64},
+  '910':{n:'Emerald Green Dark',r:24,g:136,b:76},
+  '911':{n:'Emerald Green Med',r:37,g:159,b:93},
+  '912':{n:'Emerald Green Light',r:62,g:181,b:115},
+  '913':{n:'Nile Green Medium',r:109,g:192,b:144},
+  '915':{n:'Plum Dark',r:142,g:8,b:79},
+  '917':{n:'Plum Medium',r:177,g:29,b:104},
+  '918':{n:'Red Copper Dark',r:144,g:60,b:21},
+  '919':{n:'Red Copper',r:174,g:79,b:30},
+  '920':{n:'Copper Medium',r:185,g:100,b:46},
+  '921':{n:'Copper',r:204,g:118,b:58},
+  '922':{n:'Copper Light',r:222,g:146,b:80},
+  '924':{n:'Gray Green Very Dark',r:71,g:100,b:99},
+  '926':{n:'Gray Green Medium',r:130,g:162,b:159},
+  '927':{n:'Gray Green Light',r:167,g:192,b:190},
+  '928':{n:'Gray Green Very Light',r:205,g:218,b:217},
+  '930':{n:'Antique Blue Dark',r:73,g:96,b:120},
+  '931':{n:'Antique Blue Medium',r:105,g:132,b:157},
+  '932':{n:'Antique Blue Light',r:154,g:175,b:196},
+  '934':{n:'Black Avocado Green',r:56,g:66,b:27},
+  '935':{n:'Avocado Green Dark',r:72,g:88,b:37},
+  '936':{n:'Avocado Green Vy Dk',r:82,g:97,b:38},
+  '937':{n:'Avocado Green Med',r:107,g:128,b:47},
+  '938':{n:'Coffee Brown Ultra Dk',r:56,g:23,b:7},
+  '939':{n:'Navy Blue Very Dark',r:21,g:31,b:77},
+  '943':{n:'Aquamarine Med',r:58,g:168,b:153},
+  '945':{n:'Tawny',r:251,g:210,b:172},
+  '946':{n:'Burnt Orange Med',r:228,g:94,b:28},
+  '947':{n:'Burnt Orange',r:255,g:122,b:53},
+  '948':{n:'Peach Very Light',r:254,g:232,b:215},
+  '950':{n:'Desert Sand Light',r:230,g:186,b:158},
+  '951':{n:'Tawny Light',r:252,g:220,b:188},
+  '954':{n:'Nile Green',r:127,g:203,b:163},
+  '955':{n:'Nile Green Light',r:162,g:220,b:190},
+  '956':{n:'Geranium',r:254,g:101,b:114},
+  '957':{n:'Geranium Pale',r:255,g:167,b:170},
+  '958':{n:'Sea Green Dark',r:57,g:185,b:170},
+  '959':{n:'Sea Green Medium',r:92,g:202,b:187},
+  '961':{n:'Dusty Rose Dark',r:210,g:104,b:124},
+  '962':{n:'Dusty Rose Med',r:232,g:137,b:153},
+  '963':{n:'Dusty Rose Ultra Vy Lt',r:255,g:212,b:215},
+  '964':{n:'Sea Green Light',r:164,g:225,b:218},
+  '966':{n:'Baby Green Med',r:168,g:211,b:181},
+  '970':{n:'Pumpkin Light',r:248,g:143,b:38},
+  '971':{n:'Pumpkin',r:253,g:126,b:5},
+  '972':{n:'Canary Deep',r:255,g:179,b:13},
+  '973':{n:'Canary Bright',r:255,g:220,b:7},
+  '975':{n:'Golden Brown Dark',r:148,g:83,b:21},
+  '976':{n:'Golden Brown Med',r:199,g:132,b:57},
+  '977':{n:'Golden Brown Light',r:222,g:162,b:81},
+  '986':{n:'Forest Green Vy Dk',r:58,g:81,b:45},
+  '987':{n:'Forest Green Dark',r:78,g:107,b:60},
+  '988':{n:'Forest Green Med',r:107,g:142,b:87},
+  '989':{n:'Forest Green',r:140,g:172,b:116},
+  '3011':{n:'Khaki Green Dark',r:143,g:143,b:82},
+  '3012':{n:'Khaki Green Med',r:176,g:173,b:104},
+  '3013':{n:'Khaki Green Light',r:198,g:196,b:140},
+  '3021':{n:'Brown Gray Vy Dk',r:79,g:71,b:58},
+  '3022':{n:'Brown Gray Med',r:145,g:136,b:114},
+  '3023':{n:'Brown Gray Light',r:185,g:175,b:155},
+  '3024':{n:'Brown Gray Vy Lt',r:228,g:222,b:209},
+  '3031':{n:'Mocha Brown Vy Dk',r:72,g:52,b:27},
+  '3032':{n:'Mocha Brown Med',r:180,g:158,b:124},
+  '3033':{n:'Mocha Brown Vy Lt',r:224,g:207,b:180},
+  '3041':{n:'Antique Violet Med',r:155,g:119,b:147},
+  '3042':{n:'Antique Violet Light',r:194,g:165,b:185},
+  '3045':{n:'Yellow Beige Dark',r:196,g:160,b:101},
+  '3046':{n:'Yellow Beige Med',r:219,g:190,b:136},
+  '3047':{n:'Yellow Beige Light',r:237,g:219,b:183},
+  '3051':{n:'Green Gray Dark',r:96,g:105,b:68},
+  '3052':{n:'Green Gray Med',r:135,g:147,b:104},
+  '3053':{n:'Green Gray',r:165,g:176,b:133},
+  '3064':{n:'Desert Sand',r:197,g:143,b:104},
+  '3072':{n:'Beaver Gray Vy Lt',r:226,g:224,b:220},
+  '3078':{n:'Golden Yellow Vy Lt',r:254,g:249,b:197},
+  '3325':{n:'Baby Blue Light',r:183,g:213,b:234},
+  '3326':{n:'Rose Light',r:252,g:178,b:183},
+  '3328':{n:'Salmon Dark',r:215,g:103,b:100},
+  '3340':{n:'Apricot Medium',r:244,g:118,b:83},
+  '3341':{n:'Apricot',r:249,g:155,b:116},
+  '3345':{n:'Hunter Green Dark',r:49,g:90,b:37},
+  '3346':{n:'Hunter Green',r:72,g:119,b:57},
+  '3347':{n:'Yellow Green Med',r:110,g:156,b:89},
+  '3348':{n:'Yellow Green Light',r:197,g:222,b:172},
+  '3350':{n:'Dusty Rose Ultra Dk',r:188,g:60,b:89},
+  '3354':{n:'Dusty Rose Light',r:224,g:165,b:170},
+  '3362':{n:'Pine Green Dark',r:77,g:100,b:65},
+  '3363':{n:'Pine Green Med',r:103,g:131,b:88},
+  '3364':{n:'Pine Green',r:130,g:162,b:112},
+  '3371':{n:'Black Brown',r:34,g:18,b:7},
+  '3607':{n:'Plum Light',r:202,g:75,b:149},
+  '3608':{n:'Plum Very Light',r:228,g:144,b:188},
+  '3609':{n:'Plum Ultra Light',r:243,g:186,b:216},
+  '3685':{n:'Mauve Very Dark',r:145,g:26,b:56},
+  '3687':{n:'Mauve',r:202,g:117,b:131},
+  '3688':{n:'Mauve Medium',r:224,g:167,b:176},
+  '3689':{n:'Mauve Light',r:244,g:202,b:208},
+  '3705':{n:'Melon Dark',r:255,g:107,b:103},
+  '3706':{n:'Melon Medium',r:255,g:148,b:143},
+  '3708':{n:'Melon Light',r:255,g:189,b:183},
+  '3712':{n:'Salmon Medium',r:236,g:130,b:121},
+  '3713':{n:'Salmon Very Light',r:255,g:214,b:207},
+  '3716':{n:'Dusty Rose Med Vy Lt',r:255,g:187,b:191},
+  '3721':{n:'Shell Pink Dark',r:175,g:82,b:82},
+  '3722':{n:'Shell Pink Med',r:191,g:104,b:100},
+  '3726':{n:'Antique Mauve Dark',r:164,g:92,b:108},
+  '3727':{n:'Antique Mauve Light',r:231,g:189,b:197},
+  '3731':{n:'Dusty Rose Vy Dk',r:209,g:92,b:111},
+  '3733':{n:'Dusty Rose',r:231,g:132,b:148},
+  '3740':{n:'Antique Violet Dark',r:115,g:81,b:110},
+  '3743':{n:'Antique Violet Vy Lt',r:213,g:202,b:216},
+  '3746':{n:'Blue Violet Dark',r:113,g:108,b:172},
+  '3747':{n:'Blue Violet Vy Lt',r:213,g:216,b:237},
+  '3750':{n:'Antique Blue Vy Dk',r:44,g:67,b:90},
+  '3752':{n:'Antique Blue Very Light',r:193,g:208,b:221},
+  '3753':{n:'Antique Blue Ultra Lt',r:218,g:228,b:237},
+  '3755':{n:'Baby Blue',r:140,g:177,b:213},
+  '3756':{n:'Baby Blue Ultra Vy Lt',r:228,g:244,b:252},
+  '3760':{n:'Wedgwood Medium',r:59,g:131,b:168},
+  '3761':{n:'Sky Blue Light',r:156,g:210,b:228},
+  '3765':{n:'Peacock Blue Vy Dk',r:32,g:120,b:144},
+  '3766':{n:'Peacock Blue Light',r:124,g:196,b:212},
+  '3768':{n:'Gray Green Dark',r:90,g:122,b:121},
+  '3770':{n:'Tawny Very Light',r:255,g:232,b:212},
+  '3771':{n:'Terra Cotta Ultra Vy Lt',r:244,g:196,b:175},
+  '3772':{n:'Desert Sand Vy Dk',r:166,g:103,b:68},
+  '3773':{n:'Desert Sand Med',r:199,g:141,b:99},
+  '3774':{n:'Desert Sand Vy Lt',r:247,g:222,b:199},
+  '3776':{n:'Mahogany Light',r:208,g:121,b:60},
+  '3777':{n:'Terra Cotta Very Dark',r:130,g:58,b:38},
+  '3778':{n:'Terra Cotta Light',r:215,g:140,b:117},
+  '3779':{n:'Rosewood Ultra Vy Lt',r:252,g:210,b:204},
+  '3781':{n:'Mocha Brown Dark',r:107,g:82,b:54},
+  '3782':{n:'Mocha Brown Lt',r:207,g:185,b:153},
+  '3787':{n:'Brown Gray Dark',r:103,g:97,b:81},
+  '3790':{n:'Beige Gray Ultra Dk',r:109,g:94,b:73},
+  '3799':{n:'Pewter Gray Vy Dk',r:60,g:59,b:60},
+  '3801':{n:'Melon Very Dark',r:218,g:53,b:66},
+  '3802':{n:'Antique Mauve Vy Dk',r:128,g:60,b:75},
+  '3803':{n:'Mauve Dark',r:171,g:51,b:83},
+  '3804':{n:'Cyclamen Pink Dark',r:218,g:41,b:108},
+  '3805':{n:'Cyclamen Pink',r:234,g:65,b:130},
+  '3806':{n:'Cyclamen Pink Light',r:249,g:129,b:178},
+  '3807':{n:'Cornflower Blue',r:92,g:102,b:157},
+  '3808':{n:'Turquoise Ultra Vy Dk',r:49,g:125,b:138},
+  '3809':{n:'Turquoise Very Dark',r:55,g:147,b:162},
+  '3810':{n:'Turquoise Dark',r:63,g:166,b:183},
+  '3811':{n:'Turquoise Very Light',r:178,g:228,b:234},
+  '3812':{n:'Sea Green Very Dark',r:39,g:155,b:145},
+  '3813':{n:'Blue Green Lt',r:181,g:220,b:201},
+  '3814':{n:'Aquamarine',r:71,g:152,b:137},
+  '3815':{n:'Celadon Green Dark',r:68,g:127,b:100},
+  '3816':{n:'Celadon Green',r:91,g:159,b:126},
+  '3817':{n:'Celadon Green Light',r:149,g:198,b:170},
+  '3818':{n:'Emerald Grn Ult Vy Dk',r:9,g:94,b:51},
+  '3819':{n:'Moss Green Lt',r:222,g:233,b:130},
+  '3820':{n:'Straw Dark',r:222,g:181,b:80},
+  '3821':{n:'Straw',r:247,g:211,b:99},
+  '3822':{n:'Straw Light',r:250,g:224,b:135},
+  '3823':{n:'Yellow Ultra Pale',r:255,g:252,b:222},
+  '3824':{n:'Apricot Light',r:253,g:188,b:158},
+  '3825':{n:'Pumpkin Pale',r:253,g:185,b:116},
+  '3826':{n:'Golden Brown',r:183,g:120,b:46},
+  '3827':{n:'Golden Brown Pale',r:245,g:191,b:104},
+  '3828':{n:'Hazel Nut Brown',r:176,g:131,b:78},
+  '3829':{n:'Old Gold Very Dark',r:165,g:126,b:19},
+  '3830':{n:'Terra Cotta',r:183,g:88,b:68},
+  '3831':{n:'Raspberry Dark',r:172,g:33,b:65},
+  '3832':{n:'Raspberry Medium',r:208,g:70,b:99},
+  '3833':{n:'Raspberry Light',r:230,g:126,b:148},
+  '3834':{n:'Grape Dark',r:119,g:51,b:105},
+  '3835':{n:'Grape Medium',r:152,g:89,b:143},
+  '3836':{n:'Grape Light',r:190,g:144,b:185},
+  '3837':{n:'Lavender Ultra Dark',r:105,g:54,b:120},
+  '3838':{n:'Lavender Blue Dark',r:80,g:100,b:162},
+  '3839':{n:'Lavender Blue Med',r:112,g:134,b:189},
+  '3840':{n:'Lavender Blue Light',r:162,g:178,b:218},
+  '3841':{n:'Baby Blue Pale',r:207,g:226,b:241},
+  '3842':{n:'Wedgwood Dark',r:42,g:103,b:139},
+  '3843':{n:'Electric Blue',r:27,g:168,b:212},
+  '3844':{n:'Bright Turquoise Dark',r:0,g:178,b:198},
+  '3845':{n:'Bright Turquoise Med',r:5,g:193,b:207},
+  '3846':{n:'Bright Turquoise Lt',r:5,g:212,b:225},
+  '3847':{n:'Teal Green Dark',r:46,g:120,b:106},
+  '3848':{n:'Teal Green Med',r:68,g:149,b:134},
+  '3849':{n:'Teal Green Light',r:81,g:177,b:160},
+  '3850':{n:'Bright Green Dark',r:48,g:141,b:109},
+  '3851':{n:'Bright Green Light',r:74,g:191,b:150},
+  '3852':{n:'Straw Very Dark',r:196,g:150,b:40},
+  '3853':{n:'Autumn Gold Dark',r:240,g:148,b:48},
+  '3854':{n:'Autumn Gold Med',r:248,g:176,b:80},
+  '3855':{n:'Autumn Gold Light',r:253,g:207,b:120},
+  '3856':{n:'Mahogany Ultra Vy Lt',r:255,g:202,b:161},
+  '3857':{n:'Rosewood Dark',r:101,g:27,b:27},
+  '3858':{n:'Rosewood Med',r:167,g:78,b:72},
+  '3859':{n:'Rosewood Light',r:211,g:156,b:143},
+  '3860':{n:'Cocoa',r:117,g:82,b:74},
+  '3861':{n:'Cocoa Light',r:171,g:139,b:130},
+  '3862':{n:'Mocha Beige Dark',r:143,g:107,b:69},
+  '3863':{n:'Mocha Beige Med',r:169,g:133,b:91},
+  '3864':{n:'Mocha Beige Lt',r:204,g:176,b:138},
+  '3865':{n:'Winter White',r:249,g:247,b:242},
+  '3866':{n:'Mocha Brown Ultra Lt',r:244,g:238,b:226}
+};</script>
+<script>
+// ================================================================
+// CANVAS RENDERER (zoom/pan + pattern drawing)
+// ================================================================
+class CanvasRenderer {
+  constructor(canvas){
+    this.canvas=canvas;
+    this.ctx=canvas.getContext('2d');
+    this.scale=1;this.tx=0;this.ty=0;
+    this.dragging=false;this.lx=0;this.ly=0;
+    this.result=null;
+    this.opts={showGrid:true,showSymbols:true,showCenter:true,cellPx:16};
+    this._setupEvents();
+  }
+
+  _setupEvents(){
+    const c=this.canvas;
+    c.addEventListener('wheel',e=>{e.preventDefault();this._zoom(e);},{passive:false});
+    c.addEventListener('mousedown',e=>{this.dragging=true;this.lx=e.clientX;this.ly=e.clientY;c.style.cursor='grabbing';});
+    c.addEventListener('mousemove',e=>{
+      if(this.dragging){this.tx+=e.clientX-this.lx;this.ty+=e.clientY-this.ly;this.lx=e.clientX;this.ly=e.clientY;this._draw();}
+      this._updateInfo(e);
+    });
+    c.addEventListener('mouseup',e=>{this.dragging=false;c.style.cursor='crosshair';this._handleClick(e);});
+    c.addEventListener('mouseleave',()=>{this.dragging=false;c.style.cursor='crosshair';});
+    // Touch support
+    let lt=null;
+    c.addEventListener('touchstart',e=>{e.preventDefault();if(e.touches.length===1){lt={x:e.touches[0].clientX,y:e.touches[0].clientY};}},{passive:false});
+    c.addEventListener('touchmove',e=>{e.preventDefault();if(e.touches.length===1&&lt){this.tx+=e.touches[0].clientX-lt.x;this.ty+=e.touches[0].clientY-lt.y;lt={x:e.touches[0].clientX,y:e.touches[0].clientY};this._draw();}},{passive:false});
+    c.addEventListener('touchend',()=>{lt=null;});
+  }
+
+  _zoom(e){
+    const f=e.deltaY<0?1.12:0.88;
+    const r=this.canvas.getBoundingClientRect();
+    const mx=e.clientX-r.left,my=e.clientY-r.top;
+    this.tx=mx-(mx-this.tx)*f;this.ty=my-(my-this.ty)*f;
+    this.scale=Math.max(0.04,Math.min(30,this.scale*f));
+    this._draw();
+  }
+
+  _cellAt(e){
+    if(!this.result)return null;
+    const r=this.canvas.getBoundingClientRect();
+    const mx=e.clientX-r.left,my=e.clientY-r.top;
+    const cx=Math.floor((mx-this.tx)/(this.opts.cellPx*this.scale));
+    const cy=Math.floor((my-this.ty)/(this.opts.cellPx*this.scale));
+    if(cx<0||cy<0||cx>=this.result.gridW||cy>=this.result.gridH)return null;
+    return{cx,cy,idx:this.result.grid[cy*this.result.gridW+cx]};
+  }
+
+  _updateInfo(e){
+    const cell=this._cellAt(e);
+    const info=document.getElementById('canvas-info');
+    if(!cell||!this.result){info.textContent='No pattern';return;}
+    if(cell.idx<0){info.textContent=`(${cell.cx+1},${cell.cy+1}) — background`;return;}
+    const pe=this.result.palette[cell.idx];
+    info.textContent=`(${cell.cx+1},${cell.cy+1}) — DMC ${pe.num} ${pe.name}  [${SYMBOLS[cell.idx%SYMBOLS.length]}]`;
+  }
+
+  _handleClick(e){
+    if(!this.result||Math.abs(e.movementX)+Math.abs(e.movementY)>3)return;
+    const cell=this._cellAt(e);
+    if(!cell||cell.idx<0)return;
+    if(typeof window._onCellClick==='function')window._onCellClick(cell.idx);
+  }
+
+  load(result,opts={}){
+    this.result=result;
+    Object.assign(this.opts,opts);
+    this.fitToView();
+  }
+
+  fitToView(){
+    if(!this.result)return;
+    const{gridW,gridH}=this.result;
+    const cp=this.canvas.cellPx||this.opts.cellPx;
+    const pw=gridW*cp,ph=gridH*cp;
+    const cw=this.canvas.parentElement.clientWidth||800;
+    const ch=this.canvas.parentElement.clientHeight||600;
+    this.scale=Math.min((cw-20)/pw,(ch-20)/ph,1);
+    this.tx=(cw-pw*this.scale)/2;
+    this.ty=(ch-ph*this.scale)/2;
+    this._draw();
+  }
+
+  zoomIn(){this.scale=Math.min(30,this.scale*1.3);this._draw();}
+  zoomOut(){this.scale=Math.max(0.04,this.scale/1.3);this._draw();}
+  zoomFit(){this.fitToView();}
+
+  resize(w,h){this.canvas.width=w;this.canvas.height=h;this._draw();}
+
+  _draw(){
+    if(!this.result)return;
+    const{grid,gridW,gridH,palette,symbolMap}=this.result;
+    const{showGrid,showSymbols,showCenter,cellPx}=this.opts;
+    const ctx=this.ctx;
+    const sc=this.scale,tx=this.tx,ty=this.ty;
+    const cp=cellPx*sc;
+
+    ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+    // Background
+    ctx.fillStyle='#111';ctx.fillRect(0,0,this.canvas.width,this.canvas.height);
+
+    // Viewport culling
+    const x0=Math.max(0,Math.floor(-tx/cp));
+    const y0=Math.max(0,Math.floor(-ty/cp));
+    const x1=Math.min(gridW,Math.ceil((this.canvas.width-tx)/cp)+1);
+    const y1=Math.min(gridH,Math.ceil((this.canvas.height-ty)/cp)+1);
+
+    // Draw cells
+    for(let cy=y0;cy<y1;cy++){
+      for(let cx=x0;cx<x1;cx++){
+        const idx=grid[cy*gridW+cx];
+        const px=tx+cx*cp,py=ty+cy*cp;
+        if(idx<0){
+          // Background: checkerboard
+          ctx.fillStyle=(cx+cy)%2===0?'#222':'#1a1a1a';
+          ctx.fillRect(px,py,cp+0.5,cp+0.5);
+          continue;
+        }
+        const pe=palette[idx];
+        ctx.fillStyle=`rgb(${pe.rgb[0]},${pe.rgb[1]},${pe.rgb[2]})`;
+        ctx.fillRect(px,py,cp+0.5,cp+0.5);
+      }
+    }
+
+    // Grid lines
+    if(showGrid&&cp>3){
+      ctx.beginPath();
+      const minorAlpha=Math.min(1,(cp-3)/10)*0.3;
+      const majorAlpha=Math.min(1,(cp-2)/6)*0.6;
+      // Minor lines
+      if(minorAlpha>0.05){
+        ctx.strokeStyle=`rgba(80,80,80,${minorAlpha})`;
+        ctx.lineWidth=0.5;
+        for(let cx=x0;cx<=x1;cx++){const px=tx+cx*cp;ctx.moveTo(px,ty+y0*cp);ctx.lineTo(px,ty+y1*cp);}
+        for(let cy=y0;cy<=y1;cy++){const py=ty+cy*cp;ctx.moveTo(tx+x0*cp,py);ctx.lineTo(tx+x1*cp,py);}
+        ctx.stroke();ctx.beginPath();
+      }
+      // Major every 10
+      if(majorAlpha>0.05){
+        ctx.strokeStyle=`rgba(120,120,140,${majorAlpha})`;
+        ctx.lineWidth=Math.max(0.8,cp/20);
+        for(let cx=x0;cx<=x1;cx++){if(cx%10===0){const px=tx+cx*cp;ctx.moveTo(px,ty+y0*cp);ctx.lineTo(px,ty+y1*cp);}}
+        for(let cy=y0;cy<=y1;cy++){if(cy%10===0){const py=ty+cy*cp;ctx.moveTo(tx+x0*cp,py);ctx.lineTo(tx+x1*cp,py);}}
+        ctx.stroke();
+      }
+    }
+
+    // Symbols
+    if(showSymbols&&cp>7){
+      const fs=Math.max(7,Math.min(cp*0.65,14));
+      ctx.font=`bold ${fs}px monospace`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      for(let cy=y0;cy<y1;cy++){
+        for(let cx=x0;cx<x1;cx++){
+          const idx=grid[cy*gridW+cx];
+          if(idx<0)continue;
+          const pe=palette[idx];
+          // Choose text color (contrast)
+          const br=0.299*pe.rgb[0]+0.587*pe.rgb[1]+0.114*pe.rgb[2];
+          ctx.fillStyle=br>128?'rgba(0,0,0,0.65)':'rgba(255,255,255,0.65)';
+          const sym=SYMBOLS[idx%SYMBOLS.length];
+          ctx.fillText(sym,tx+cx*cp+cp/2,ty+cy*cp+cp/2);
+        }
+      }
+    }
+
+    // Center marks
+    if(showCenter){
+      const cx2=gridW/2*cp+tx,cy2=gridH/2*cp+ty;
+      const sz=Math.max(6,cp*0.8);
+      ctx.fillStyle='rgba(255,60,60,0.85)';
+      // Top arrow
+      ctx.beginPath();ctx.moveTo(cx2,cy2-sz*0.3);ctx.lineTo(cx2-sz*0.3,cy2-sz);ctx.lineTo(cx2+sz*0.3,cy2-sz);ctx.closePath();ctx.fill();
+      // Left arrow
+      ctx.beginPath();ctx.moveTo(cx2-sz*0.3,cy2);ctx.lineTo(cx2-sz,cy2-sz*0.3);ctx.lineTo(cx2-sz,cy2+sz*0.3);ctx.closePath();ctx.fill();
+    }
+  }
+
+  // Render full pattern for export (returns canvas element)
+  renderForExport(cellPx=20){
+    if(!this.result)return null;
+    const{grid,gridW,gridH,palette}=this.result;
+    const LEGEND_W=260;
+    const RULER_W=24;
+    const CELL=cellPx;
+    const totalW=RULER_W+gridW*CELL+LEGEND_W;
+    const totalH=RULER_W+gridH*CELL;
+
+    const ec=document.createElement('canvas');ec.width=totalW;ec.height=totalH;
+    const ctx=ec.getContext('2d');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,totalW,totalH);
+
+    // Draw cells
+    for(let cy=0;cy<gridH;cy++){
+      for(let cx=0;cx<gridW;cx++){
+        const idx=grid[cy*gridW+cx];
+        const px=RULER_W+cx*CELL,py=RULER_W+cy*CELL;
+        if(idx<0){
+          ctx.fillStyle=(cx+cy)%2===0?'#eee':'#f8f8f8';
+          ctx.fillRect(px,py,CELL,CELL);
+          continue;
+        }
+        const pe=palette[idx];
+        ctx.fillStyle=`rgb(${pe.rgb[0]},${pe.rgb[1]},${pe.rgb[2]})`;
+        ctx.fillRect(px,py,CELL,CELL);
+      }
+    }
+
+    // Grid lines
+    ctx.strokeStyle='#ccc';ctx.lineWidth=0.5;
+    for(let cx=0;cx<=gridW;cx++){const x=RULER_W+cx*CELL;ctx.beginPath();ctx.moveTo(x,RULER_W);ctx.lineTo(x,RULER_W+gridH*CELL);ctx.stroke();}
+    for(let cy=0;cy<=gridH;cy++){const y=RULER_W+cy*CELL;ctx.beginPath();ctx.moveTo(RULER_W,y);ctx.lineTo(RULER_W+gridW*CELL,y);ctx.stroke();}
+    ctx.strokeStyle='#999';ctx.lineWidth=1;
+    for(let cx=0;cx<=gridW;cx+=10){const x=RULER_W+cx*CELL;ctx.beginPath();ctx.moveTo(x,RULER_W);ctx.lineTo(x,RULER_W+gridH*CELL);ctx.stroke();}
+    for(let cy=0;cy<=gridH;cy+=10){const y=RULER_W+cy*CELL;ctx.beginPath();ctx.moveTo(RULER_W,y);ctx.lineTo(RULER_W+gridW*CELL,y);ctx.stroke();}
+
+    // Symbols
+    const fs=Math.min(CELL*0.7,12);
+    ctx.font=`bold ${fs}px monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+    for(let cy=0;cy<gridH;cy++){
+      for(let cx=0;cx<gridW;cx++){
+        const idx=grid[cy*gridW+cx];if(idx<0)continue;
+        const pe=palette[idx];
+        const br=0.299*pe.rgb[0]+0.587*pe.rgb[1]+0.114*pe.rgb[2];
+        ctx.fillStyle=br>128?'rgba(0,0,0,0.7)':'rgba(255,255,255,0.7)';
+        ctx.fillText(SYMBOLS[idx%SYMBOLS.length],RULER_W+cx*CELL+CELL/2,RULER_W+cy*CELL+CELL/2);
+      }
+    }
+
+    // Ruler labels
+    ctx.fillStyle='#333';ctx.font='8px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    for(let cx=0;cx<gridW;cx+=10){ctx.fillText(cx+1,RULER_W+cx*CELL+CELL/2,RULER_W/2);}
+    ctx.textAlign='right';
+    for(let cy=0;cy<gridH;cy+=10){ctx.fillText(cy+1,RULER_W-2,RULER_W+cy*CELL+CELL/2);}
+
+    // Legend panel
+    const lx=RULER_W+gridW*CELL+4;
+    ctx.fillStyle='#f5f5f5';ctx.fillRect(lx,0,LEGEND_W,totalH);
+    ctx.fillStyle='#333';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+    ctx.fillText('DMC Color Legend',lx+4,14);
+    let ly=28;
+    for(const pe of palette){
+      if(ly>totalH-20)break;
+      ctx.fillStyle=`rgb(${pe.rgb[0]},${pe.rgb[1]},${pe.rgb[2]})`;
+      ctx.fillRect(lx+4,ly,14,12);
+      ctx.strokeStyle='#999';ctx.lineWidth=0.5;ctx.strokeRect(lx+4,ly,14,12);
+      ctx.fillStyle='#222';ctx.font='9px monospace';
+      ctx.fillText(SYMBOLS[pe.idx%SYMBOLS.length],lx+6,ly+9);
+      ctx.fillStyle='#333';ctx.font='9px sans-serif';
+      const sc=this.result.stitchCounts[pe.num]||0;
+      const sk=Math.ceil(sc*5*2/800);
+      ctx.fillText(`${pe.num} ${pe.name}  (${sc} sts, ${sk} sk)`,lx+22,ly+9);
+      ly+=16;
+    }
+    return ec;
+  }
+}
+</script>
+<script>
+// ================================================================
+// EXPORT: PNG / JPEG
+// ================================================================
+function downloadCanvas(canvas, filename, type='image/png', quality=0.92){
+  canvas.toBlob(blob=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download=filename;
+    a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  },type,quality);
+}
+
+function exportPNG(renderer){
+  const ec=renderer.renderForExport(20);
+  if(!ec)return;
+  downloadCanvas(ec,'crossstitch_pattern.png','image/png');
+}
+function exportJPEG(renderer){
+  const ec=renderer.renderForExport(20);
+  if(!ec)return;
+  const bg=document.createElement('canvas');bg.width=ec.width;bg.height=ec.height;
+  const bgc=bg.getContext('2d');bgc.fillStyle='#fff';bgc.fillRect(0,0,bg.width,bg.height);bgc.drawImage(ec,0,0);
+  downloadCanvas(bg,'crossstitch_pattern.jpg','image/jpeg',0.92);
+}
+
+// ================================================================
+// EXPORT: CSV shopping list
+// ================================================================
+function exportCSV(result){
+  if(!result)return;
+  const rows=[['DMC Number','Color Name','Stitches','Skeins (2-strand)']];
+  for(const pe of result.palette){
+    const sc=result.stitchCounts[pe.num]||0;
+    const sk=Math.ceil(sc*5*2/800);
+    rows.push([pe.num,`"${pe.name}"`,sc,sk]);
+  }
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='crossstitch_shopping.csv';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+
+// ================================================================
+// EXPORT: PDF (tiled, multi-page) via jsPDF
+// ================================================================
+async function exportPDF(result, pageSize='a4'){
+  if(!result)return;
+  const{jsPDF}=window.jspdf;
+  const PAGE_FORMATS={
+    a4:[210,297],a3:[297,420],letter:[215.9,279.4]
+  };
+  const[PW,PH]=PAGE_FORMATS[pageSize]||PAGE_FORMATS.a4;
+  const MARGIN=12;
+  const CELL_MM=2.5; // mm per stitch
+  const OVERLAP=3;   // stitch overlap between pages
+
+  const{grid,gridW,gridH,palette,symbolMap,stitchCounts}=result;
+
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:pageSize});
+  const RULER_MM=6;
+
+  // Available area per page
+  const availW=PW-2*MARGIN-RULER_MM;
+  const availH=PH-2*MARGIN-RULER_MM-12; // 12 for header
+  const cellsPerPageX=Math.max(1,Math.floor(availW/CELL_MM));
+  const cellsPerPageY=Math.max(1,Math.floor(availH/CELL_MM));
+
+  // ── Cover page ──────────────────────────────────────────────
+  doc.setFontSize(20);doc.setFont('helvetica','bold');
+  doc.setTextColor(40,80,160);
+  doc.text('CrossStitch Designer',PW/2,30,{align:'center'});
+  doc.setFontSize(12);doc.setFont('helvetica','normal');doc.setTextColor(80,80,80);
+  doc.text('Pattern Chart',PW/2,40,{align:'center'});
+  doc.setFontSize(10);
+  doc.text(`Grid: ${gridW} × ${gridH} stitches`,PW/2,55,{align:'center'});
+  doc.text(`Colors: ${palette.length} DMC threads`,PW/2,62,{align:'center'});
+  // Aida size
+  const a14w=(gridW/14*2.54).toFixed(1),a14h=(gridH/14*2.54).toFixed(1);
+  const a16w=(gridW/16*2.54).toFixed(1),a16h=(gridH/16*2.54).toFixed(1);
+  doc.text(`14-count Aida: ${a14w} × ${a14h} cm`,PW/2,69,{align:'center'});
+  doc.text(`16-count Aida: ${a16w} × ${a16h} cm`,PW/2,76,{align:'center'});
+  // Color mini-swatches
+  let sx=MARGIN,sy=90;
+  doc.setFontSize(8);
+  for(const pe of palette){
+    const[r,g,b]=pe.rgb;
+    doc.setFillColor(r,g,b);doc.rect(sx,sy,5,4,'F');
+    doc.setDrawColor(150);doc.rect(sx,sy,5,4,'S');
+    doc.setTextColor(60);doc.text(`${SYMBOLS[pe.idx%SYMBOLS.length]} ${pe.num}`,sx+6,sy+3.5);
+    sx+=35;if(sx+35>PW-MARGIN){sx=MARGIN;sy+=8;}
+    if(sy>PH-MARGIN-20)break;
+  }
+  doc.setFontSize(7);doc.setTextColor(140);
+  doc.text('Generated by CrossStitch Designer Web',PW/2,PH-8,{align:'center'});
+
+  // ── Pattern tile pages ──────────────────────────────────────
+  const tilesX=Math.ceil(gridW/cellsPerPageX);
+  const tilesY=Math.ceil(gridH/cellsPerPageY);
+
+  for(let ty2=0;ty2<tilesY;ty2++){
+    for(let tx2=0;tx2<tilesX;tx2++){
+      doc.addPage();
+
+      const x0=tx2*cellsPerPageX,y0=ty2*cellsPerPageY;
+      const x1=Math.min(gridW,x0+cellsPerPageX+OVERLAP);
+      const y1=Math.min(gridH,y0+cellsPerPageY+OVERLAP);
+
+      // Page header
+      doc.setFontSize(8);doc.setFont('helvetica','bold');doc.setTextColor(60);
+      doc.text(`Section ${ty2*tilesX+tx2+1}/${tilesX*tilesY} — Cols ${x0+1}–${x1}, Rows ${y0+1}–${y1}`,MARGIN,MARGIN-2);
+
+      const offX=MARGIN+RULER_MM;
+      const offY=MARGIN+RULER_MM+4;
+
+      // Draw cells
+      for(let cy=y0;cy<y1;cy++){
+        for(let cx=x0;cx<x1;cx++){
+          const idx=grid[cy*gridW+cx];
+          const px=offX+(cx-x0)*CELL_MM;
+          const py=offY+(cy-y0)*CELL_MM;
+          if(idx<0){
+            doc.setFillColor(240,240,240);
+          } else {
+            const pe=palette[idx];doc.setFillColor(pe.rgb[0],pe.rgb[1],pe.rgb[2]);
+          }
+          doc.rect(px,py,CELL_MM,CELL_MM,'F');
+        }
+      }
+
+      // Grid lines
+      doc.setDrawColor(200);doc.setLineWidth(0.1);
+      for(let cx=x0;cx<=x1;cx++){
+        const px=offX+(cx-x0)*CELL_MM;
+        doc.line(px,offY,px,offY+(y1-y0)*CELL_MM);
+      }
+      for(let cy=y0;cy<=y1;cy++){
+        const py=offY+(cy-y0)*CELL_MM;
+        doc.line(offX,py,offX+(x1-x0)*CELL_MM,py);
+      }
+      // Major lines every 10
+      doc.setDrawColor(120);doc.setLineWidth(0.3);
+      for(let cx=x0;cx<=x1;cx++){if(cx%10===0){const px=offX+(cx-x0)*CELL_MM;doc.line(px,offY,px,offY+(y1-y0)*CELL_MM);}}
+      for(let cy=y0;cy<=y1;cy++){if(cy%10===0){const py=offY+(cy-y0)*CELL_MM;doc.line(offX,py,offX+(x1-x0)*CELL_MM,py);}}
+
+      // Symbols
+      doc.setFontSize(CELL_MM*1.8);doc.setFont('courier','bold');
+      for(let cy=y0;cy<y1;cy++){
+        for(let cx=x0;cx<x1;cx++){
+          const idx=grid[cy*gridW+cx];if(idx<0)continue;
+          const pe=palette[idx];
+          const br=0.299*pe.rgb[0]+0.587*pe.rgb[1]+0.114*pe.rgb[2];
+          doc.setTextColor(br>160?40:220);
+          const px=offX+(cx-x0)*CELL_MM+CELL_MM/2;
+          const py=offY+(cy-y0)*CELL_MM+CELL_MM*0.75;
+          doc.text(SYMBOLS[idx%SYMBOLS.length],px,py,{align:'center'});
+        }
+      }
+
+      // Rulers
+      doc.setFontSize(5);doc.setFont('helvetica','normal');doc.setTextColor(80);
+      for(let cx=x0;cx<x1;cx+=5){
+        doc.text(`${cx+1}`,offX+(cx-x0)*CELL_MM+CELL_MM/2,offY-1,{align:'center'});
+      }
+      for(let cy=y0;cy<y1;cy+=5){
+        doc.text(`${cy+1}`,offX-1,offY+(cy-y0)*CELL_MM+CELL_MM*0.75,{align:'right'});
+      }
+
+      // Page footer
+      doc.setFontSize(6);doc.setTextColor(150);
+      doc.text(`Page ${doc.getCurrentPageInfo().pageNumber} — Overlap ${OVERLAP} stitches on right/bottom edges`,PW/2,PH-4,{align:'center'});
+    }
+  }
+
+  // ── Legend page ──────────────────────────────────────────────
+  doc.addPage();
+  doc.setFontSize(14);doc.setFont('helvetica','bold');doc.setTextColor(40,80,160);
+  doc.text('Color Legend',MARGIN,MARGIN+6);
+  doc.setLineWidth(0.5);doc.setDrawColor(200);doc.line(MARGIN,MARGIN+9,PW-MARGIN,MARGIN+9);
+
+  let ly=MARGIN+14;
+  const COLS=2,COL_W=(PW-2*MARGIN)/COLS;
+
+  doc.setFontSize(7);doc.setFont('helvetica','normal');
+  // Header row
+  ['Sym','DMC','Name','Stitches','Skeins'].forEach((h,i)=>{
+    doc.setFont('helvetica','bold');doc.setTextColor(80);
+    doc.text(h,MARGIN+(i===0?0:i===1?10:i===2?20:i===3?80:100),ly);
+  });
+  ly+=5;
+
+  for(const pe of palette){
+    if(ly>PH-MARGIN-10){doc.addPage();ly=MARGIN+10;}
+    const sc=stitchCounts[pe.num]||0,sk=Math.ceil(sc*5*2/800);
+    const[r,g,b]=pe.rgb;
+    doc.setFillColor(r,g,b);doc.rect(MARGIN,ly-3,5,4,'F');
+    doc.setDrawColor(150);doc.rect(MARGIN,ly-3,5,4,'S');
+    doc.setFont('courier','bold');doc.setTextColor(60);
+    doc.text(SYMBOLS[pe.idx%SYMBOLS.length],MARGIN+2,ly);
+    doc.setFont('helvetica','normal');doc.setTextColor(40);
+    doc.text(pe.num,MARGIN+10,ly);
+    doc.text(pe.name,MARGIN+28,ly);
+    doc.text(`${sc}`,MARGIN+85,ly,{align:'right'});
+    doc.text(`${sk}`,MARGIN+105,ly,{align:'right'});
+    ly+=6;
+  }
+
+  // ── Shopping list page ────────────────────────────────────────
+  doc.addPage();
+  doc.setFontSize(14);doc.setFont('helvetica','bold');doc.setTextColor(40,80,160);
+  doc.text('Shopping List',MARGIN,MARGIN+6);
+  doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(80);
+  doc.text('Print and take to the embroidery shop',MARGIN,MARGIN+12);
+  doc.setLineWidth(0.5);doc.setDrawColor(200);doc.line(MARGIN,MARGIN+15,PW-MARGIN,MARGIN+15);
+
+  ly=MARGIN+22;
+  for(const pe of palette){
+    if(ly>PH-MARGIN-10){doc.addPage();ly=MARGIN+10;}
+    const sc=stitchCounts[pe.num]||0,sk=Math.ceil(sc*5*2/800);
+    const[r,g,b]=pe.rgb;
+    // Checkbox
+    doc.setDrawColor(100);doc.rect(MARGIN,ly-3,4,4);
+    // Color swatch
+    doc.setFillColor(r,g,b);doc.rect(MARGIN+7,ly-3,5,4,'F');
+    doc.setDrawColor(150);doc.rect(MARGIN+7,ly-3,5,4,'S');
+    doc.setFont('helvetica','bold');doc.setTextColor(40);
+    doc.text(`DMC ${pe.num}`,MARGIN+15,ly);
+    doc.setFont('helvetica','normal');
+    doc.text(pe.name,MARGIN+42,ly);
+    doc.text(`${sk} skein${sk!==1?'s':''}`,MARGIN+100,ly,{align:'right'});
+    doc.text(`(${sc} stitches)`,MARGIN+130,ly,{align:'right'});
+    ly+=7;
+  }
+
+  doc.save(`crossstitch_pattern_${pageSize}.pdf`);
+}
+</script>
+<script>
+// ================================================================
+// UI CONTROLLER
+// ================================================================
+const App={
+  srcImg:null,result:null,renderer:null,
+  bgSampled:false,bgR:255,bgG:255,bgB:255,
+  pickingBg:false,
+
+  init(){
+    this._initRenderer();
+    this._initEvents();
+    this._initSliderLabels();
+    this._resizeCanvas();
+    window.addEventListener('resize',()=>this._resizeCanvas());
+    // Drag & drop
+    document.body.addEventListener('dragover',e=>{e.preventDefault();});
+    document.body.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))this._loadFile(f);});
+  },
+
+  _initRenderer(){
+    const canvas=document.getElementById('pattern-canvas');
+    this.renderer=new CanvasRenderer(canvas);
+    // Cell click → remap color
+    window._onCellClick=(idx)=>this._showRemapModal(idx);
+  },
+
+  _initEvents(){
+    document.getElementById('btn-load').onclick=()=>document.getElementById('file-input').click();
+    document.getElementById('file-input').onchange=e=>{if(e.target.files[0])this._loadFile(e.target.files[0]);};
+    document.getElementById('btn-analyze').onclick=()=>this._analyse();
+    document.getElementById('btn-png').onclick=()=>{if(this.result)exportPNG(this.renderer);};
+    document.getElementById('btn-jpeg').onclick=()=>{if(this.result)exportJPEG(this.renderer);};
+    document.getElementById('btn-pdf').onclick=()=>{if(this.result)exportPDF(this.result,document.getElementById('pdf-size').value);};
+    document.getElementById('btn-csv').onclick=()=>{if(this.result)exportCSV(this.result);};
+    document.getElementById('btn-zin').onclick=()=>this.renderer.zoomIn();
+    document.getElementById('btn-zout').onclick=()=>this.renderer.zoomOut();
+    document.getElementById('btn-zfit').onclick=()=>this.renderer.zoomFit();
+    // Grid W/H lock
+    const gw=document.getElementById('grid-w'),gh=document.getElementById('grid-h');
+    gw.oninput=()=>{if(document.getElementById('lock-aspect').checked&&this.srcImg)
+      {gh.value=Math.round(gw.value*this.srcImg.naturalHeight/this.srcImg.naturalWidth);}};
+    gh.oninput=()=>{if(document.getElementById('lock-aspect').checked&&this.srcImg)
+      {gw.value=Math.round(gh.value*this.srcImg.naturalWidth/this.srcImg.naturalHeight);}};
+    // Preset buttons
+    document.querySelectorAll('.preset-w').forEach(b=>b.onclick=()=>{
+      const w=+b.dataset.w;gw.value=w;
+      if(document.getElementById('lock-aspect').checked&&this.srcImg)
+        gh.value=Math.round(w*this.srcImg.naturalHeight/this.srcImg.naturalWidth);
+    });
+    document.querySelectorAll('.preset-c').forEach(b=>b.onclick=()=>{
+      document.getElementById('num-colors').value=b.dataset.c;
+    });
+    // BG method
+    document.getElementById('bg-method').onchange=e=>{
+      const m=e.target.value;
+      document.getElementById('bg-tol-group').style.display=m==='tolerance'?'':'none';
+      document.getElementById('bg-ai-group').style.display=m==='ai'?'':'none';
+    };
+    // Pick BG color
+    document.getElementById('btn-pick-bg').onclick=()=>this._startPickBg();
+    document.getElementById('bg-pick-overlay').addEventListener('click',e=>this._pickBgFromOverlay(e));
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&this.pickingBg)this._cancelPickBg();});
+    // Display options live update
+    ['show-grid','show-symbols','show-center'].forEach(id=>{
+      document.getElementById(id).onchange=()=>this._updateDisplayOpts();
+    });
+    document.getElementById('cell-size').oninput=()=>{
+      this.opts={...this._getOpts()};
+      this._updateDisplayOpts();
+    };
+    // Remap modal
+    document.getElementById('modal-cancel').onclick=()=>document.getElementById('modal-overlay').classList.remove('show');
+    document.getElementById('modal-overlay').onclick=e=>{if(e.target===document.getElementById('modal-overlay'))document.getElementById('modal-overlay').classList.remove('show');};
+    document.getElementById('remap-search').oninput=e=>this._filterRemapGrid(e.target.value);
+  },
+
+  _initSliderLabels(){
+    const pairs=[['brightness','bright-val'],['contrast','contrast-val'],['saturation','sat-val'],['sharpness','sharp-val'],['blur','blur-val'],['bg-tol','tol-val'],['merge-thr','merge-val']];
+    pairs.forEach(([sid,lid])=>{
+      const s=document.getElementById(sid),l=document.getElementById(lid);
+      s.oninput=()=>{l.textContent=s.value;};
+    });
+  },
+
+  _resizeCanvas(){
+    const wrap=document.getElementById('canvas-wrap');
+    const c=document.getElementById('pattern-canvas');
+    c.width=wrap.clientWidth||600;c.height=wrap.clientHeight||500;
+    if(this.renderer)this.renderer._draw();
+  },
+
+  _loadFile(file){
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      this.srcImg=img;
+      // Show source preview
+      const si=document.getElementById('source-img');
+      si.src=url;si.style.display='block';
+      document.getElementById('source-placeholder').style.display='none';
+      document.getElementById('img-info').textContent=`${file.name}  ${img.naturalWidth}×${img.naturalHeight}px`;
+      // Set default grid size
+      const gw=document.getElementById('grid-w'),gh=document.getElementById('grid-h');
+      const w=+gw.value;
+      gh.value=Math.round(w*img.naturalHeight/img.naturalWidth);
+      // Enable analyse
+      document.getElementById('btn-analyze').disabled=false;
+      this._setStatus('Image loaded. Configure settings and click Analyse.');
+      // Set up BG pick overlay using source img
+      document.getElementById('bg-pick-overlay').style.backgroundImage=`url(${url})`;
+      document.getElementById('bg-pick-overlay').style.backgroundSize='contain';
+      document.getElementById('bg-pick-overlay').style.backgroundRepeat='no-repeat';
+      document.getElementById('bg-pick-overlay').style.backgroundPosition='center';
+    };
+    img.src=url;
+  },
+
+  _getOpts(){
+    return{
+      gridW:+document.getElementById('grid-w').value||80,
+      gridH:+document.getElementById('grid-h').value||100,
+      numColors:+document.getElementById('num-colors').value||16,
+      mergeThr:+document.getElementById('merge-thr').value||10,
+      bgMethod:document.getElementById('bg-method').value,
+      bgR:this.bgR,bgG:this.bgG,bgB:this.bgB,
+      bgTol:+document.getElementById('bg-tol').value,
+      useFlood:document.getElementById('use-flood').checked,
+      brightness:+document.getElementById('brightness').value,
+      contrast:+document.getElementById('contrast').value,
+      saturation:+document.getElementById('saturation').value,
+      sharpness:+document.getElementById('sharpness').value,
+      blur:+document.getElementById('blur').value,
+      showGrid:document.getElementById('show-grid').checked,
+      showSymbols:document.getElementById('show-symbols').checked,
+      showCenter:document.getElementById('show-center').checked,
+      cellPx:+document.getElementById('cell-size').value||16,
+    };
+  },
+
+  async _analyse(){
+    if(!this.srcImg)return;
+    const opts=this._getOpts();
+    this._showOverlay('Analysing…','Starting…');
+    try{
+      this.result=await buildPattern(this.srcImg,opts,(msg,pct)=>{
+        document.getElementById('work-msg').textContent=msg;
+        document.getElementById('work-sub').textContent=`${pct}%`;
+        document.getElementById('progress-bar').style.width=pct+'%';
+      });
+      this.renderer.load(this.result,{
+        showGrid:opts.showGrid,showSymbols:opts.showSymbols,
+        showCenter:opts.showCenter,cellPx:opts.cellPx
+      });
+      this._updateLegend();
+      this._updateFabricInfo();
+      ['btn-png','btn-jpeg','btn-pdf','btn-csv'].forEach(id=>{document.getElementById(id).disabled=false;});
+      this._setStatus(`Pattern ready: ${this.result.gridW}×${this.result.gridH} stitches, ${this.result.palette.length} colors`);
+    }catch(e){
+      this._setStatus('Error: '+e.message);
+      alert('Analysis failed: '+e.message);
+    }
+    this._hideOverlay();
+    document.getElementById('progress-bar').style.width='0%';
+  },
+
+  _updateDisplayOpts(){
+    if(!this.renderer||!this.result)return;
+    this.renderer.opts.showGrid=document.getElementById('show-grid').checked;
+    this.renderer.opts.showSymbols=document.getElementById('show-symbols').checked;
+    this.renderer.opts.showCenter=document.getElementById('show-center').checked;
+    this.renderer.opts.cellPx=+document.getElementById('cell-size').value||16;
+    this.renderer._draw();
+  },
+
+  _updateLegend(){
+    const r=this.result;if(!r)return;
+    // Stats
+    const totalSts=Object.values(r.stitchCounts).reduce((a,b)=>a+b,0);
+    const totalSk=r.palette.reduce((a,pe)=>a+Math.ceil((r.stitchCounts[pe.num]||0)*5*2/800),0);
+    document.getElementById('legend-stats').innerHTML=
+      `<strong>${r.palette.length}</strong> colors &nbsp;|&nbsp; <strong>${totalSts.toLocaleString()}</strong> stitches &nbsp;|&nbsp; <strong>${totalSk}</strong> skeins`;
+    // Table
+    const tbody=document.getElementById('legend-body');tbody.innerHTML='';
+    for(const pe of r.palette){
+      const sc=r.stitchCounts[pe.num]||0;
+      const sk=Math.ceil(sc*5*2/800);
+      const sym=SYMBOLS[pe.idx%SYMBOLS.length];
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td><span class="swatch" style="background:rgb(${pe.rgb[0]},${pe.rgb[1]},${pe.rgb[2]})"></span></td>
+        <td class="sym-cell">${sym}</td>
+        <td><span class="dmc-remap" title="Double-click to remap" data-idx="${pe.idx}">${pe.num}</span></td>
+        <td style="font-size:11px">${pe.name}</td>
+        <td style="text-align:right">${sc.toLocaleString()}</td>
+        <td style="text-align:right">${sk}</td>`;
+      tbody.appendChild(tr);
+    }
+    // Remap via dmc-remap span
+    tbody.querySelectorAll('.dmc-remap').forEach(el=>{
+      el.addEventListener('dblclick',()=>this._showRemapModal(+el.dataset.idx));
+      el.addEventListener('click',()=>this._showRemapModal(+el.dataset.idx));
+    });
+  },
+
+  _updateFabricInfo(){
+    const r=this.result;if(!r)return;
+    const a14w=(r.gridW/14*2.54).toFixed(1),a14h=(r.gridH/14*2.54).toFixed(1);
+    const a16w=(r.gridW/16*2.54).toFixed(1),a16h=(r.gridH/16*2.54).toFixed(1);
+    const a18w=(r.gridW/18*2.54).toFixed(1),a18h=(r.gridH/18*2.54).toFixed(1);
+    document.getElementById('fabric-info').innerHTML=
+      `<b>14-count Aida:</b> ${a14w} × ${a14h} cm<br>`+
+      `<b>16-count Aida:</b> ${a16w} × ${a16h} cm<br>`+
+      `<b>18-count Aida:</b> ${a18w} × ${a18h} cm`;
+  },
+
+  // ── Background picker ──────────────────────────────────────
+  _startPickBg(){
+    if(!this.srcImg){alert('Load an image first.');return;}
+    this.pickingBg=true;
+    document.getElementById('bg-pick-overlay').style.display='block';
+  },
+  _cancelPickBg(){
+    this.pickingBg=false;
+    document.getElementById('bg-pick-overlay').style.display='none';
+  },
+  _pickBgFromOverlay(e){
+    if(!this.pickingBg)return;
+    // Determine pixel in source image
+    const overlay=document.getElementById('bg-pick-overlay');
+    const r=overlay.getBoundingClientRect();
+    const iw=this.srcImg.naturalWidth,ih=this.srcImg.naturalHeight;
+    // Background-size: contain, center
+    const scale=Math.min(r.width/iw,r.height/ih);
+    const imgDisplayW=iw*scale,imgDisplayH=ih*scale;
+    const imgX=(r.width-imgDisplayW)/2,imgY=(r.height-imgDisplayH)/2;
+    const px=(e.clientX-r.left-imgX)/scale,py=(e.clientY-r.top-imgY)/scale;
+    if(px<0||py<0||px>=iw||py>=ih){this._cancelPickBg();return;}
+    // Draw source to work canvas to read pixel
+    const wc=document.getElementById('work-canvas');
+    wc.width=iw;wc.height=ih;
+    wc.getContext('2d').drawImage(this.srcImg,0,0);
+    const id=wc.getContext('2d').getImageData(Math.floor(px),Math.floor(py),1,1);
+    this.bgR=id.data[0];this.bgG=id.data[1];this.bgB=id.data[2];
+    this.bgSampled=true;
+    document.getElementById('bg-color-swatch').style.background=`rgb(${this.bgR},${this.bgG},${this.bgB})`;
+    document.getElementById('bg-color-val').textContent=`rgb(${this.bgR},${this.bgG},${this.bgB})`;
+    this._cancelPickBg();
+  },
+
+  // ── Color remap ───────────────────────────────────────────
+  _showRemapModal(paletteIdx){
+    if(!this.result)return;
+    this._remapIdx=paletteIdx;
+    const pe=this.result.palette[paletteIdx];
+    document.getElementById('remap-current').innerHTML=
+      `<span class="swatch" style="background:rgb(${pe.rgb[0]},${pe.rgb[1]},${pe.rgb[2]});display:inline-block;vertical-align:middle;width:16px;height:14px"></span> `+
+      `DMC ${pe.num} — ${pe.name} &nbsp; <kbd>${SYMBOLS[paletteIdx%SYMBOLS.length]}</kbd>`;
+    document.getElementById('remap-search').value='';
+    this._buildRemapGrid('');
+    document.getElementById('modal-overlay').classList.add('show');
+    document.getElementById('remap-search').focus();
+  },
+
+  _buildRemapGrid(filter){
+    const grid=document.getElementById('remap-grid');
+    grid.innerHTML='';
+    const fl=filter.toLowerCase();
+    let count=0;
+    for(const[num,v] of Object.entries(DMC)){
+      if(fl&&!num.toLowerCase().includes(fl)&&!v.n.toLowerCase().includes(fl))continue;
+      if(count>200)break; count++;
+      const div=document.createElement('div');div.className='remap-item';
+      div.innerHTML=`<span class="sw" style="background:rgb(${v.r},${v.g},${v.b})"></span><span>${num}</span>`;
+      div.title=`${num} — ${v.n}`;
+      div.onclick=()=>this._applyRemap(num);
+      grid.appendChild(div);
+    }
+  },
+
+  _filterRemapGrid(q){this._buildRemapGrid(q);},
+
+  _applyRemap(newDmcNum){
+    if(!this.result||this._remapIdx===undefined)return;
+    const r=this.result;
+    const oldPe=r.palette[this._remapIdx];
+    const v=DMC[newDmcNum];if(!v)return;
+    // Update palette
+    const newPe={num:newDmcNum,name:v.n,rgb:[v.r,v.g,v.b],lab:rgbToLab(v.r,v.g,v.b),idx:oldPe.idx};
+    r.palette[this._remapIdx]=newPe;
+    // Move stitch count
+    r.stitchCounts[newDmcNum]=(r.stitchCounts[newDmcNum]||0)+(r.stitchCounts[oldPe.num]||0);
+    if(newDmcNum!==oldPe.num)delete r.stitchCounts[oldPe.num];
+    r.symbolMap[newDmcNum]=r.symbolMap[oldPe.num];
+    delete r.symbolMap[oldPe.num];
+    document.getElementById('modal-overlay').classList.remove('show');
+    this.renderer._draw();
+    this._updateLegend();
+  },
+
+  _setStatus(msg){document.getElementById('status').textContent=msg;},
+  _showOverlay(msg,sub=''){
+    document.getElementById('work-msg').textContent=msg;
+    document.getElementById('work-sub').textContent=sub;
+    document.getElementById('work-overlay').classList.add('show');
+  },
+  _hideOverlay(){document.getElementById('work-overlay').classList.remove('show');}
+};
+
+document.addEventListener('DOMContentLoaded',()=>App.init());
+</script>
+</body>
+</html>
